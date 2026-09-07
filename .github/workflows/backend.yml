@@ -1,4 +1,4 @@
-name: CI
+name: backend
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
   pull_request:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -20,5 +20,8 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - run: ./mvnw --batch-mode verify
-        working-directory: ./backend
+      - run: ./mvnw -B spotless:apply
+      - uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Apply spotless formatting"
+      - run: ./mvnw -B verify
