@@ -22,3 +22,46 @@
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
 replay_pid*
+
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+application-local.yaml
+application-secrets.yaml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Frontend
+node_modules/
+dist/
+build/
+.vite/
+coverage/
+*.local
+
+# AI-verktyg
+.claude/
+CLAUDE.md
+.cursor/
+.cursorrules
+.cursorignore
+.aider*
+.continue/
+.windsurfrules
+.github/copilot-instructions.md
+.codeium/
+.roo/
+.cline/
+.mcp.json
+.env.mcp
+AGENTS.md
+.agent/
+.ai/
