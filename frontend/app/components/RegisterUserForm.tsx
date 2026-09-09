@@ -23,7 +23,10 @@ export default function RegisterUserForm() {
   return (
     <AuthWrapper
       footer={
-        <Link href='/login' className='hover:text-gray-700 underline'>
+        <Link
+          href='/login'
+          className='flex flex-row justify-center gap-1 hover:text-primary'
+        >
           Logga in
         </Link>
       }
@@ -31,34 +34,32 @@ export default function RegisterUserForm() {
       <InputField
         control={form.control}
         name='email'
-        label='Enter email'
-        placeholder='Email'
+        label='E-post'
+        placeholder='E-post'
         type='email'
         autoComplete='email'
       />
       <InputField
         control={form.control}
         name='password'
-        label='Enter password'
+        label='Lösenord'
         placeholder='Lösenord'
         type='password'
-        autoComplete='new-password'
       />
       <InputField
         control={form.control}
         name='confirmPassword'
-        label='Confirm password'
+        label='Bekräfta lösenord'
         placeholder='Bekräfta lösenord'
         type='password'
-        autoComplete='new-password'
       />
       <button
         type='button'
         disabled={!form.formState.isValid}
         onClick={submit}
-        className='rounded-3xl border p-2 border-white bg-blue-200 disabled:bg-blue-950'
+        className='rounded-lg max-h-15 bg-primary p-2 font-medium text-white transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:bg-muted'
       >
-        Skicka
+        Skapa konto
       </button>
     </AuthWrapper>
   );

@@ -24,19 +24,21 @@ export default function InputField<T extends FieldValues>({
       control={control}
       name={name}
       render={({ field, fieldState }) => (
-        <div>
-          <label htmlFor={name} className='sr-only'>
+        <div className='grid'>
+          <label htmlFor={name} className='text-sm text-foreground'>
             {label}
           </label>
           <input
             id={name}
-            className='w-full rounded-3xl border p-2 dark:text-white focus:outline-none focus:ring-2'
+            className='w-full rounded-lg border border-muted/50 bg-background p-2 text-sm text-foreground placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30'
             type={type}
             placeholder={placeholder}
             autoComplete={autoComplete}
             {...field}
           />
-          <p className='text-amber-600 min-h-6'>{fieldState.error?.message}</p>
+          <p className='min-h-5 text-sm mt-2 text-error'>
+            {fieldState.error?.message}
+          </p>
         </div>
       )}
     />

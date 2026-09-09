@@ -20,23 +20,27 @@ export default function LoginForm() {
   return (
     <AuthWrapper
       footer={
-        <Link href='/register' className='hover:text-gray-700 flex flex-row'>
-          Har du inget konto ännu?<p className='underline ml-2'> Klicka här</p>
+        <Link
+          href='/register'
+          className='flex flex-row justify-center gap-1 hover:text-primary'
+        >
+          Har du inget konto ännu?
+          <span className='font-semibold underline'>Klicka här</span>
         </Link>
       }
     >
       <InputField
         control={form.control}
         name='email'
-        label='Enter email'
-        placeholder='Email'
+        label='E-post'
+        placeholder='E-post'
         type='email'
         autoComplete='email'
       />
       <InputField
         control={form.control}
         name='password'
-        label='Enter password'
+        label='Lösenord'
         placeholder='Lösenord'
         type='password'
         autoComplete='current-password'
@@ -45,9 +49,9 @@ export default function LoginForm() {
         type='button'
         disabled={!form.formState.isValid}
         onClick={submit}
-        className='rounded-3xl border p-2 border-gray-400 bg-green-800 disabled:bg-gray-800'
+        className='rounded-lg max-h-15 bg-primary p-2 font-medium text-white dark:text-black transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:bg-muted'
       >
-        Skicka
+        Logga in
       </button>
     </AuthWrapper>
   );
