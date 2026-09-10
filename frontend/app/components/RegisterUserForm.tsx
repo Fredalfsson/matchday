@@ -5,9 +5,9 @@ import Link from 'next/link';
 import {
   registerUserSchema,
   RegisterUserFormValues,
-} from '../lib/schemas/registerUserSchema';
-import AuthWrapper from './AuthWrapper';
-import InputField from './InputField';
+} from '@/app/lib/schemas/registerUserSchema';
+import Wrapper from '@/app/components/Wrapper';
+import InputField from '@/app/components/InputField';
 
 export default function RegisterUserForm() {
   const form = useForm<RegisterUserFormValues>({
@@ -21,7 +21,7 @@ export default function RegisterUserForm() {
   });
 
   return (
-    <AuthWrapper
+    <Wrapper
       footer={
         <Link
           href='/login'
@@ -61,6 +61,6 @@ export default function RegisterUserForm() {
       >
         Skapa konto
       </button>
-    </AuthWrapper>
+    </Wrapper>
   );
 }

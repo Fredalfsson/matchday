@@ -1,9 +1,9 @@
 type Props = {
   children: React.ReactNode;
-  footer: React.ReactNode;
+  footer?: React.ReactNode;
 };
 
-export default function AuthWrapper({ children, footer }: Props) {
+export default function hWrapper({ children, footer }: Props) {
   return (
     <div className='m-4 p-4 grid w-full max-w-sm gap-4 rounded-2xl border border-primary-dark/15 bg-surface shadow-md shadow-primary-dark/10'>
       {children}

@@ -6,9 +6,7 @@ export const emailField = z
   .refine(
     (e) =>
       !e.includes('privaterelay.appleid.com') && !e.includes('@passinbox.com'),
-    {
-      message: 'Denna mailadress är inte godkänd',
-    },
+    { message: 'Denna mailadress är inte godkänd' },
   );
 
 export const passwordField = z

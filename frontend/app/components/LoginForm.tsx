@@ -2,9 +2,9 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import Link from 'next/link';
-import { loginSchema, LoginFormValues } from '../lib/schemas/loginSchema';
-import InputField from './InputField';
-import AuthWrapper from './AuthWrapper';
+import { loginSchema, LoginFormValues } from '@/app/lib/schemas/loginSchema';
+import InputField from '@/app/components/InputField';
+import Wrapper from '@/app/components/Wrapper';
 
 export default function LoginForm() {
   const form = useForm<LoginFormValues>({
@@ -18,7 +18,7 @@ export default function LoginForm() {
   });
 
   return (
-    <AuthWrapper
+    <Wrapper
       footer={
         <Link
           href='/register'
@@ -53,6 +53,6 @@ export default function LoginForm() {
       >
         Logga in
       </button>
-    </AuthWrapper>
+    </Wrapper>
   );
 }
