@@ -3,8 +3,8 @@ import GamesComponent from '@/app/components/GamesComponent';
 export default function Dashboard() {
   return (
     <div className='flex justify-around'>
-      <GamesComponent name='Tidigare Matcher' />
-      <GamesComponent name='Kommande Matcher' />
+      <GamesComponent heading='Tidigare Matcher' />
+      <GamesComponent heading='Kommande Matcher' />
     </div>
   );
 }
