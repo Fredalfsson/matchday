@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class MatchTest {
@@ -34,12 +35,10 @@ class MatchTest {
     assertThatThrownBy(
             () ->
                 new Match(
-                    " ",
+                    UUID.randomUUID(),
                     2026,
                     1,
-                    "home-1",
-                    "Home",
-                    "away-1",
+                    " ",
                     "Away",
                     LocalDate.of(2026, 4, 4),
                     Instant.parse("2026-04-04T13:00:00Z"),
@@ -48,17 +47,15 @@ class MatchTest {
                     MatchStatus.SCHEDULED,
                     null))
         .isInstanceOf(IllegalArgumentException.class)
-        .hasMessage("externalId must not be blank");
+        .hasMessage("homeTeamName must not be blank");
   }
 
   private Match match(Integer homeScore, Integer awayScore, MatchStatus status) {
     return new Match(
-        "event-1",
+        UUID.randomUUID(),
         2026,
         1,
-        "home-1",
         "Home",
-        "away-1",
         "Away",
         LocalDate.of(2026, 4, 4),
         Instant.parse("2026-04-04T13:00:00Z"),

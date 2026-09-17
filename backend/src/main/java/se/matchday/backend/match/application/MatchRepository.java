@@ -5,7 +5,7 @@ import se.matchday.backend.match.domain.Match;
 
 public interface MatchRepository {
 
-  void saveAll(List<Match> matches);
+  void saveAll(List<ProviderMatch> matches);
 
   List<Match> findAll();
 }

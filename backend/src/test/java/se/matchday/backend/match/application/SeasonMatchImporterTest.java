@@ -19,7 +19,7 @@ class SeasonMatchImporterTest {
     RecordingMatchRepository repository = new RecordingMatchRepository();
     SeasonMatchImporter importer = new SeasonMatchImporter(provider, repository);
 
-    List<Match> matches = importer.importSeason(2026);
+    List<ProviderMatch> matches = importer.importSeason(2026);
 
     assertThat(provider.requestedRounds()).containsExactlyElementsOf(roundsOneThroughThirty());
     assertThat(matches)
@@ -27,7 +27,7 @@ class SeasonMatchImporterTest {
         .allSatisfy(match -> assertThat(match.season()).isEqualTo(2026));
     assertThat(matches).filteredOn(match -> match.round() == 1).hasSize(8);
     assertThat(matches).filteredOn(match -> match.round() == 30).hasSize(8);
-    assertThat(repository.findAll()).containsExactlyElementsOf(matches);
+    assertThat(repository.savedMatches()).containsExactlyElementsOf(matches);
   }
 
   @Test
@@ -40,7 +40,7 @@ class SeasonMatchImporterTest {
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("season must be a positive integer");
     assertThat(provider.requestedRounds()).isEmpty();
-    assertThat(repository.findAll()).isEmpty();
+    assertThat(repository.savedMatches()).isEmpty();
   }
 
   @Test
@@ -60,7 +60,7 @@ class SeasonMatchImporterTest {
 
     assertThatThrownBy(() -> importer.importSeason(2026)).isSameAs(failure);
     assertThat(requestedRounds).containsExactly(1, 2, 3);
-    assertThat(repository.findAll()).isEmpty();
+    assertThat(repository.savedMatches()).isEmpty();
   }
 
   private List<Integer> roundsOneThroughThirty() {
@@ -72,7 +72,7 @@ class SeasonMatchImporterTest {
     private final List<Integer> requestedRounds = new ArrayList<>();
 
     @Override
-    public List<Match> fetchRound(int season, int round) {
+    public List<ProviderMatch> fetchRound(int season, int round) {
       requestedRounds.add(round);
       return IntStream.rangeClosed(1, 8)
           .mapToObj(matchNumber -> match(season, round, matchNumber))
@@ -83,8 +83,8 @@ class SeasonMatchImporterTest {
       return List.copyOf(requestedRounds);
     }
 
-    private Match match(int season, int round, int matchNumber) {
-      return new Match(
+    private ProviderMatch match(int season, int round, int matchNumber) {
+      return new ProviderMatch(
           "event-" + round + "-" + matchNumber,
           season,
           round,
@@ -103,15 +103,19 @@ class SeasonMatchImporterTest {
 
   private static final class RecordingMatchRepository implements MatchRepository {
 
-    private List<Match> matches = List.of();
+    private List<ProviderMatch> matches = List.of();
 
     @Override
-    public void saveAll(List<Match> matches) {
+    public void saveAll(List<ProviderMatch> matches) {
       this.matches = List.copyOf(matches);
     }
 
     @Override
     public List<Match> findAll() {
+      return List.of();
+    }
+
+    List<ProviderMatch> savedMatches() {
       return matches;
     }
   }

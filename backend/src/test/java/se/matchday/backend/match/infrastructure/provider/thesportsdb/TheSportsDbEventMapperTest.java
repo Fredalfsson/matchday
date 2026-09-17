@@ -6,7 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.time.Instant;
 import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
-import se.matchday.backend.match.domain.Match;
+import se.matchday.backend.match.application.ProviderMatch;
 import se.matchday.backend.match.domain.MatchStatus;
 import se.matchday.backend.match.infrastructure.provider.thesportsdb.dto.TheSportsDbEventDto;
 
@@ -15,12 +15,12 @@ class TheSportsDbEventMapperTest {
   private final TheSportsDbEventMapper mapper = new TheSportsDbEventMapper();
 
   @Test
-  void mapsAFinishedMatchToTheDomainModel() {
-    Match match = mapper.toMatch(finishedEvent());
+  void mapsAFinishedMatchToTheProviderModel() {
+    ProviderMatch match = mapper.toProviderMatch(finishedEvent());
 
     assertThat(match)
         .isEqualTo(
-            new Match(
+            new ProviderMatch(
                 "2398752",
                 2026,
                 1,
@@ -57,7 +57,7 @@ class TheSportsDbEventMapperTest {
             null,
             null);
 
-    Match match = mapper.toMatch(event);
+    ProviderMatch match = mapper.toProviderMatch(event);
 
     assertThat(match.kickoffAt()).isNull();
     assertThat(match.homeScore()).isNull();
@@ -87,7 +87,7 @@ class TheSportsDbEventMapperTest {
             null,
             "Nationalarenan");
 
-    assertThat(mapper.toMatch(event).status()).isEqualTo(MatchStatus.POSTPONED);
+    assertThat(mapper.toProviderMatch(event).status()).isEqualTo(MatchStatus.POSTPONED);
   }
 
   @Test
@@ -111,7 +111,8 @@ class TheSportsDbEventMapperTest {
             null,
             null);
 
-    assertThat(mapper.toMatch(event).kickoffAt()).isEqualTo(Instant.parse("2026-04-12T13:00:00Z"));
+    assertThat(mapper.toProviderMatch(event).kickoffAt())
+        .isEqualTo(Instant.parse("2026-04-12T13:00:00Z"));
   }
 
   @Test
@@ -136,7 +137,7 @@ class TheSportsDbEventMapperTest {
               null,
               null);
 
-      assertThat(mapper.toMatch(event).status()).isEqualTo(MatchStatus.FINISHED);
+      assertThat(mapper.toProviderMatch(event).status()).isEqualTo(MatchStatus.FINISHED);
     }
   }
 
@@ -161,7 +162,7 @@ class TheSportsDbEventMapperTest {
             "17256",
             "Stora Valla");
 
-    assertThatThrownBy(() -> mapper.toMatch(event))
+    assertThatThrownBy(() -> mapper.toProviderMatch(event))
         .isInstanceOf(TheSportsDbMappingException.class)
         .hasMessage("Missing required field idEvent");
   }
@@ -187,7 +188,7 @@ class TheSportsDbEventMapperTest {
             "17256",
             "Stora Valla");
 
-    assertThatThrownBy(() -> mapper.toMatch(event))
+    assertThatThrownBy(() -> mapper.toProviderMatch(event))
         .isInstanceOf(TheSportsDbMappingException.class)
         .hasMessage(
             "Invalid TheSportsDB event 2398752: both score fields must be present or absent")
@@ -215,7 +216,7 @@ class TheSportsDbEventMapperTest {
             "17256",
             "Stora Valla");
 
-    assertThatThrownBy(() -> mapper.toMatch(event))
+    assertThatThrownBy(() -> mapper.toProviderMatch(event))
         .isInstanceOf(TheSportsDbMappingException.class)
         .hasMessageContaining("dateEvent must use ISO date format");
   }
@@ -241,7 +242,7 @@ class TheSportsDbEventMapperTest {
             "17256",
             "Stora Valla");
 
-    assertThatThrownBy(() -> mapper.toMatch(event))
+    assertThatThrownBy(() -> mapper.toProviderMatch(event))
         .isInstanceOf(TheSportsDbMappingException.class)
         .hasMessageContaining("strTimestamp must use ISO-8601 timestamp format");
   }

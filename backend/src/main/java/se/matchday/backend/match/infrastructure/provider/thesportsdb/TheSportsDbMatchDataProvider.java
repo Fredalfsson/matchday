@@ -3,7 +3,7 @@ package se.matchday.backend.match.infrastructure.provider.thesportsdb;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 import se.matchday.backend.match.application.MatchDataProvider;
-import se.matchday.backend.match.domain.Match;
+import se.matchday.backend.match.application.ProviderMatch;
 import se.matchday.backend.match.infrastructure.provider.thesportsdb.dto.TheSportsDbEventDto;
 import se.matchday.backend.match.infrastructure.provider.thesportsdb.dto.TheSportsDbEventsResponseDto;
 
@@ -26,7 +26,7 @@ final class TheSportsDbMatchDataProvider implements MatchDataProvider {
   }
 
   @Override
-  public List<Match> fetchRound(int season, int round) {
+  public List<ProviderMatch> fetchRound(int season, int round) {
     requirePositive(season, "season");
     requirePositive(round, "round");
 
@@ -42,7 +42,7 @@ final class TheSportsDbMatchDataProvider implements MatchDataProvider {
     if (events == null || events.isEmpty()) {
       return List.of();
     }
-    return events.stream().map(mapper::toMatch).toList();
+    return events.stream().map(mapper::toProviderMatch).toList();
   }
 
   private void requirePositive(int value, String field) {

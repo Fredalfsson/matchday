@@ -7,5 +7,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 interface SpringDataMatchJpaRepository extends JpaRepository<MatchJpaEntity, UUID> {
 
-  List<MatchJpaEntity> findAllByExternalIdIn(Collection<String> externalIds);
+  List<MatchJpaEntity> findAllByExternalMatchIdIn(Collection<String> externalMatchIds);
 }

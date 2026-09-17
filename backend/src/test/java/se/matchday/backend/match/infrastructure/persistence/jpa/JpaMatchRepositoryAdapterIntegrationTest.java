@@ -11,6 +11,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import se.matchday.backend.TestcontainersConfiguration;
 import se.matchday.backend.match.application.MatchRepository;
+import se.matchday.backend.match.application.ProviderMatch;
 import se.matchday.backend.match.domain.Match;
 import se.matchday.backend.match.domain.MatchStatus;
 
@@ -26,12 +27,13 @@ class JpaMatchRepositoryAdapterIntegrationTest {
   }
 
   @Test
-  void insertsNewMatchesAndUpdatesAnExistingMatchByExternalId() {
-    Match scheduled = scheduledMatch("event-1", 1, LocalDate.of(2026, 4, 4));
+  void insertsNewMatchesAndUpdatesAnExistingMatchByExternalMatchId() {
+    ProviderMatch scheduled = scheduledMatch("event-1", 1, LocalDate.of(2026, 4, 4));
     repository.saveAll(List.of(scheduled));
+    Match initiallyStored = repository.findAll().getFirst();
 
-    Match finished =
-        new Match(
+    ProviderMatch finished =
+        new ProviderMatch(
             "event-1",
             2026,
             1,
@@ -45,15 +47,29 @@ class JpaMatchRepositoryAdapterIntegrationTest {
             1,
             MatchStatus.FINISHED,
             "Updated Arena");
-    Match second = scheduledMatch("event-2", 2, LocalDate.of(2026, 4, 12));
+    ProviderMatch second = scheduledMatch("event-2", 2, LocalDate.of(2026, 4, 12));
     repository.saveAll(List.of(finished, second));
 
-    assertThat(repository.findAll()).containsExactlyInAnyOrder(finished, second);
+    assertThat(repository.findAll())
+        .extracting(
+            (Match match) -> match.homeTeamName(),
+            (Match match) -> match.scheduledDate(),
+            (Match match) -> match.status())
+        .containsExactlyInAnyOrder(
+            org.assertj.core.groups.Tuple.tuple(
+                "Home", LocalDate.of(2026, 4, 5), MatchStatus.FINISHED),
+            org.assertj.core.groups.Tuple.tuple(
+                "Home", LocalDate.of(2026, 4, 12), MatchStatus.SCHEDULED));
+    assertThat(repository.findAll())
+        .filteredOn(match -> match.round() == 1)
+        .singleElement()
+        .extracting((Match match) -> match.id())
+        .isEqualTo(initiallyStored.id());
   }
 
-  private Match scheduledMatch(String externalId, int round, LocalDate scheduledDate) {
-    return new Match(
-        externalId,
+  private ProviderMatch scheduledMatch(String externalMatchId, int round, LocalDate scheduledDate) {
+    return new ProviderMatch(
+        externalMatchId,
         2026,
         round,
         "home-" + round,

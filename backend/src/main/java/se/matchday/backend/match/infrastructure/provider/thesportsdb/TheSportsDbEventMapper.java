@@ -8,35 +8,37 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Locale;
 import org.jspecify.annotations.Nullable;
-import se.matchday.backend.match.domain.Match;
+import se.matchday.backend.match.application.ProviderMatch;
 import se.matchday.backend.match.domain.MatchStatus;
 import se.matchday.backend.match.infrastructure.provider.thesportsdb.dto.TheSportsDbEventDto;
 
 final class TheSportsDbEventMapper {
 
-  Match toMatch(TheSportsDbEventDto event) {
-    String externalId = required(event.eventId(), "idEvent");
-    int season = positiveInteger(event.season(), "strSeason", externalId);
-    int round = positiveInteger(event.round(), "intRound", externalId);
-    String homeTeamId = required(event.homeTeamId(), "idHomeTeam", externalId);
-    String homeTeamName = required(event.homeTeamName(), "strHomeTeam", externalId);
-    String awayTeamId = required(event.awayTeamId(), "idAwayTeam", externalId);
-    String awayTeamName = required(event.awayTeamName(), "strAwayTeam", externalId);
-    LocalDate scheduledDate = date(event.eventDate(), "dateEvent", externalId);
-    Instant kickoffAt = optionalUtcTimestamp(event.timestamp(), "strTimestamp", externalId);
-    Integer homeScore = optionalNonNegativeInteger(event.homeScore(), "intHomeScore", externalId);
-    Integer awayScore = optionalNonNegativeInteger(event.awayScore(), "intAwayScore", externalId);
+  ProviderMatch toProviderMatch(TheSportsDbEventDto event) {
+    String externalMatchId = required(event.eventId(), "idEvent");
+    int season = positiveInteger(event.season(), "strSeason", externalMatchId);
+    int round = positiveInteger(event.round(), "intRound", externalMatchId);
+    String homeTeamExternalId = required(event.homeTeamId(), "idHomeTeam", externalMatchId);
+    String homeTeamName = required(event.homeTeamName(), "strHomeTeam", externalMatchId);
+    String awayTeamExternalId = required(event.awayTeamId(), "idAwayTeam", externalMatchId);
+    String awayTeamName = required(event.awayTeamName(), "strAwayTeam", externalMatchId);
+    LocalDate scheduledDate = date(event.eventDate(), "dateEvent", externalMatchId);
+    Instant kickoffAt = optionalUtcTimestamp(event.timestamp(), "strTimestamp", externalMatchId);
+    Integer homeScore =
+        optionalNonNegativeInteger(event.homeScore(), "intHomeScore", externalMatchId);
+    Integer awayScore =
+        optionalNonNegativeInteger(event.awayScore(), "intAwayScore", externalMatchId);
 
     MatchStatus status = status(event.status(), event.postponed());
 
     try {
-      return new Match(
-          externalId,
+      return new ProviderMatch(
+          externalMatchId,
           season,
           round,
-          homeTeamId,
+          homeTeamExternalId,
           homeTeamName,
-          awayTeamId,
+          awayTeamExternalId,
           awayTeamName,
           scheduledDate,
           kickoffAt,
@@ -46,7 +48,8 @@ final class TheSportsDbEventMapper {
           optionalText(event.venueName()));
     } catch (IllegalArgumentException exception) {
       throw new TheSportsDbMappingException(
-          "Invalid TheSportsDB event " + externalId + ": " + exception.getMessage(), exception);
+          "Invalid TheSportsDB event " + externalMatchId + ": " + exception.getMessage(),
+          exception);
     }
   }
 

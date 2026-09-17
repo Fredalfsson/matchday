@@ -12,6 +12,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
+import se.matchday.backend.match.application.ProviderMatch;
 import se.matchday.backend.match.domain.Match;
 import se.matchday.backend.match.domain.MatchStatus;
 
@@ -24,7 +25,7 @@ class MatchJpaEntity {
   private @Nullable UUID id;
 
   @Column(name = "external_id", nullable = false, updatable = false, unique = true, length = 255)
-  private String externalId = "";
+  private String externalMatchId = "";
 
   @Column(nullable = false)
   private int season;
@@ -33,13 +34,13 @@ class MatchJpaEntity {
   private int round;
 
   @Column(name = "home_team_id", nullable = false, length = 255)
-  private String homeTeamId = "";
+  private String homeTeamExternalId = "";
 
   @Column(name = "home_team_name", nullable = false, length = 255)
   private String homeTeamName = "";
 
   @Column(name = "away_team_id", nullable = false, length = 255)
-  private String awayTeamId = "";
+  private String awayTeamExternalId = "";
 
   @Column(name = "away_team_name", nullable = false, length = 255)
   private String awayTeamName = "";
@@ -65,24 +66,24 @@ class MatchJpaEntity {
 
   protected MatchJpaEntity() {}
 
-  MatchJpaEntity(Match match) {
-    this.externalId = match.externalId();
+  MatchJpaEntity(ProviderMatch match) {
+    this.externalMatchId = match.externalMatchId();
     updateFrom(match);
   }
 
-  String externalId() {
-    return externalId;
+  String externalMatchId() {
+    return externalMatchId;
   }
 
-  void updateFrom(Match match) {
-    if (!externalId.equals(match.externalId())) {
-      throw new IllegalArgumentException("externalId cannot be changed");
+  void updateFrom(ProviderMatch match) {
+    if (!externalMatchId.equals(match.externalMatchId())) {
+      throw new IllegalArgumentException("externalMatchId cannot be changed");
     }
     season = match.season();
     round = match.round();
-    homeTeamId = match.homeTeamId();
+    homeTeamExternalId = match.homeTeamExternalId();
     homeTeamName = match.homeTeamName();
-    awayTeamId = match.awayTeamId();
+    awayTeamExternalId = match.awayTeamExternalId();
     awayTeamName = match.awayTeamName();
     scheduledDate = match.scheduledDate();
     kickoffAt = match.kickoffAt();
@@ -93,13 +94,14 @@ class MatchJpaEntity {
   }
 
   Match toDomain() {
+    if (id == null) {
+      throw new IllegalStateException("A persisted match must have an id");
+    }
     return new Match(
-        externalId,
+        id,
         season,
         round,
-        homeTeamId,
         homeTeamName,
-        awayTeamId,
         awayTeamName,
         scheduledDate,
         kickoffAt,

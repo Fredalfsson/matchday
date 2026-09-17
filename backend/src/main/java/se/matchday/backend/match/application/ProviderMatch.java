@@ -1,16 +1,19 @@
-package se.matchday.backend.match.domain;
+package se.matchday.backend.match.application;
 
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Objects;
-import java.util.UUID;
 import org.jspecify.annotations.Nullable;
+import se.matchday.backend.match.domain.MatchStatus;
 
-public record Match(
-    UUID id,
+/** Provider-neutral match data accepted by the import use case. */
+public record ProviderMatch(
+    String externalMatchId,
     int season,
     int round,
+    String homeTeamExternalId,
     String homeTeamName,
+    String awayTeamExternalId,
     String awayTeamName,
     LocalDate scheduledDate,
     @Nullable Instant kickoffAt,
@@ -19,11 +22,13 @@ public record Match(
     MatchStatus status,
     @Nullable String venueName) {
 
-  public Match {
-    Objects.requireNonNull(id, "id must not be null");
+  public ProviderMatch {
+    requireText(externalMatchId, "externalMatchId");
     requirePositive(season, "season");
     requirePositive(round, "round");
+    requireText(homeTeamExternalId, "homeTeamExternalId");
     requireText(homeTeamName, "homeTeamName");
+    requireText(awayTeamExternalId, "awayTeamExternalId");
     requireText(awayTeamName, "awayTeamName");
     Objects.requireNonNull(scheduledDate, "scheduledDate must not be null");
     Objects.requireNonNull(status, "status must not be null");

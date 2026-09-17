@@ -6,7 +6,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Objects;
 import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -32,13 +31,11 @@ final class TheSportsDbRequestExecutor {
     this.maxRetries = properties.maxRetries();
     this.fallbackRetryDelay = properties.fallbackRetryDelay();
     this.maximumRetryDelay = properties.maximumRetryDelay();
-    this.clock = Objects.requireNonNull(clock);
-    this.sleeper = Objects.requireNonNull(sleeper);
+    this.clock = clock;
+    this.sleeper = sleeper;
   }
 
   synchronized <T extends @Nullable Object> T execute(Supplier<T> request) {
-    Objects.requireNonNull(request);
-
     int retries = 0;
     while (true) {
       awaitRequestSlot();

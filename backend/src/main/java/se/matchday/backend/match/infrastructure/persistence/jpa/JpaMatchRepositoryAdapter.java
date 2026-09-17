@@ -10,6 +10,7 @@ import java.util.Set;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 import se.matchday.backend.match.application.MatchRepository;
+import se.matchday.backend.match.application.ProviderMatch;
 import se.matchday.backend.match.domain.Match;
 
 @Repository
@@ -23,28 +24,29 @@ class JpaMatchRepositoryAdapter implements MatchRepository {
 
   @Override
   @Transactional
-  public void saveAll(List<Match> matches) {
+  public void saveAll(List<ProviderMatch> matches) {
     Objects.requireNonNull(matches, "matches must not be null");
     if (matches.isEmpty()) {
       return;
     }
 
-    Set<String> externalIds = new HashSet<>();
-    for (Match match : matches) {
-      externalIds.add(Objects.requireNonNull(match, "matches must not contain null").externalId());
+    Set<String> externalMatchIds = new HashSet<>();
+    for (ProviderMatch match : matches) {
+      externalMatchIds.add(
+          Objects.requireNonNull(match, "matches must not contain null").externalMatchId());
     }
 
-    Map<String, MatchJpaEntity> entitiesByExternalId = new HashMap<>();
-    for (MatchJpaEntity entity : repository.findAllByExternalIdIn(externalIds)) {
-      entitiesByExternalId.put(entity.externalId(), entity);
+    Map<String, MatchJpaEntity> entitiesByExternalMatchId = new HashMap<>();
+    for (MatchJpaEntity entity : repository.findAllByExternalMatchIdIn(externalMatchIds)) {
+      entitiesByExternalMatchId.put(entity.externalMatchId(), entity);
     }
 
     List<MatchJpaEntity> newEntities = new ArrayList<>();
-    for (Match match : matches) {
-      MatchJpaEntity entity = entitiesByExternalId.get(match.externalId());
+    for (ProviderMatch match : matches) {
+      MatchJpaEntity entity = entitiesByExternalMatchId.get(match.externalMatchId());
       if (entity == null) {
         entity = new MatchJpaEntity(match);
-        entitiesByExternalId.put(match.externalId(), entity);
+        entitiesByExternalMatchId.put(match.externalMatchId(), entity);
         newEntities.add(entity);
       } else {
         entity.updateFrom(match);

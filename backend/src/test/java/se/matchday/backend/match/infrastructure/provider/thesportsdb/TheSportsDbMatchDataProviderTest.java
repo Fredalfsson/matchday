@@ -11,7 +11,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
-import se.matchday.backend.match.domain.Match;
+import se.matchday.backend.match.application.ProviderMatch;
 import se.matchday.backend.match.domain.MatchStatus;
 import se.matchday.backend.match.infrastructure.provider.thesportsdb.dto.TheSportsDbEventDto;
 import se.matchday.backend.match.infrastructure.provider.thesportsdb.dto.TheSportsDbEventsResponseDto;
@@ -24,7 +24,7 @@ class TheSportsDbMatchDataProviderTest {
         new RecordingClient(new TheSportsDbEventsResponseDto(List.of(event())));
     TheSportsDbMatchDataProvider provider = provider(client);
 
-    List<Match> matches = provider.fetchRound(2026, 1);
+    List<ProviderMatch> matches = provider.fetchRound(2026, 1);
 
     assertThat(client.apiKey).isEqualTo("test-key");
     assertThat(client.leagueId).isEqualTo("4347");
@@ -32,7 +32,7 @@ class TheSportsDbMatchDataProviderTest {
     assertThat(client.season).isEqualTo(2026);
     assertThat(matches)
         .containsExactly(
-            new Match(
+            new ProviderMatch(
                 "2398752",
                 2026,
                 1,
@@ -53,7 +53,7 @@ class TheSportsDbMatchDataProviderTest {
     TheSportsDbMatchDataProvider provider =
         provider(new RecordingClient(new TheSportsDbEventsResponseDto(null)));
 
-    List<Match> matches = provider.fetchRound(2026, 1);
+    List<ProviderMatch> matches = provider.fetchRound(2026, 1);
 
     assertThat(matches).isEmpty();
   }
