@@ -17,3 +17,8 @@ management:
     web:
       exposure:
         include: health,info
+matchday:
+  providers:
+    the-sports-db:
+      api-key: ${THESPORTSDB_API_KEY:123}
+      league-id: ${THESPORTSDB_LEAGUE_ID:4347}

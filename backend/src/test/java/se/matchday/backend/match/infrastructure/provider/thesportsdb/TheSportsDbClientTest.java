@@ -49,7 +49,10 @@ class TheSportsDbClientTest {
         .andExpect(header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE))
         .andRespond(withSuccess(fixture(), MediaType.APPLICATION_JSON));
 
-    TheSportsDbEventsResponseDto response = client.getEventsByRound("test-key", "4347", 1, 2026);
+    TheSportsDbEventsResponseDto response =
+        Objects.requireNonNull(
+            client.getEventsByRound("test-key", "4347", 1, 2026),
+            "The fixture should produce a response body");
 
     List<TheSportsDbEventDto> events =
         Objects.requireNonNull(response.events(), "The fixture should contain events");
@@ -103,7 +106,10 @@ class TheSportsDbClientTest {
         .andExpect(header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE))
         .andRespond(withSuccess("{\"events\":null}", MediaType.APPLICATION_JSON));
 
-    TheSportsDbEventsResponseDto response = client.getEventsByRound("test-key", "4347", 31, 2026);
+    TheSportsDbEventsResponseDto response =
+        Objects.requireNonNull(
+            client.getEventsByRound("test-key", "4347", 31, 2026),
+            "The fixture should produce a response body");
 
     assertThat(response.events()).isNull();
 

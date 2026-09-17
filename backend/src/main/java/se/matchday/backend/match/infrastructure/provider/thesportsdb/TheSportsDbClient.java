@@ -1,5 +1,6 @@
 package se.matchday.backend.match.infrastructure.provider.thesportsdb;
 
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -11,7 +12,7 @@ import se.matchday.backend.match.infrastructure.provider.thesportsdb.dto.TheSpor
 interface TheSportsDbClient {
 
   @GetExchange("/{apiKey}/eventsround.php")
-  TheSportsDbEventsResponseDto getEventsByRound(
+  @Nullable TheSportsDbEventsResponseDto getEventsByRound(
       @PathVariable("apiKey") String apiKey,
       @RequestParam("id") String leagueId,
       @RequestParam("r") int round,
