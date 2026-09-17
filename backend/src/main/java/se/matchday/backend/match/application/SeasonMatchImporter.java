@@ -11,10 +11,13 @@ public final class SeasonMatchImporter {
   private static final int LAST_ROUND = 30;
 
   private final MatchDataProvider matchDataProvider;
+  private final MatchRepository matchRepository;
 
-  public SeasonMatchImporter(MatchDataProvider matchDataProvider) {
+  public SeasonMatchImporter(MatchDataProvider matchDataProvider, MatchRepository matchRepository) {
     this.matchDataProvider =
         Objects.requireNonNull(matchDataProvider, "matchDataProvider must not be null");
+    this.matchRepository =
+        Objects.requireNonNull(matchRepository, "matchRepository must not be null");
   }
 
   public List<Match> importSeason(int season) {
@@ -26,6 +29,8 @@ public final class SeasonMatchImporter {
     for (int round = FIRST_ROUND; round <= LAST_ROUND; round++) {
       matches.addAll(matchDataProvider.fetchRound(season, round));
     }
-    return List.copyOf(matches);
+    List<Match> importedMatches = List.copyOf(matches);
+    matchRepository.saveAll(importedMatches);
+    return importedMatches;
   }
 }

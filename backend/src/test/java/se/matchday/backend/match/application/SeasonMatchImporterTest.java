@@ -16,7 +16,8 @@ class SeasonMatchImporterTest {
   @Test
   void importsEveryRoundInOrderAndCollectsTheMatches() {
     RecordingMatchDataProvider provider = new RecordingMatchDataProvider();
-    SeasonMatchImporter importer = new SeasonMatchImporter(provider);
+    RecordingMatchRepository repository = new RecordingMatchRepository();
+    SeasonMatchImporter importer = new SeasonMatchImporter(provider, repository);
 
     List<Match> matches = importer.importSeason(2026);
 
@@ -26,17 +27,20 @@ class SeasonMatchImporterTest {
         .allSatisfy(match -> assertThat(match.season()).isEqualTo(2026));
     assertThat(matches).filteredOn(match -> match.round() == 1).hasSize(8);
     assertThat(matches).filteredOn(match -> match.round() == 30).hasSize(8);
+    assertThat(repository.findAll()).containsExactlyElementsOf(matches);
   }
 
   @Test
   void rejectsAnInvalidSeasonBeforeCallingTheProvider() {
     RecordingMatchDataProvider provider = new RecordingMatchDataProvider();
-    SeasonMatchImporter importer = new SeasonMatchImporter(provider);
+    RecordingMatchRepository repository = new RecordingMatchRepository();
+    SeasonMatchImporter importer = new SeasonMatchImporter(provider, repository);
 
     assertThatThrownBy(() -> importer.importSeason(0))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("season must be a positive integer");
     assertThat(provider.requestedRounds()).isEmpty();
+    assertThat(repository.findAll()).isEmpty();
   }
 
   @Test
@@ -51,10 +55,12 @@ class SeasonMatchImporterTest {
           }
           return List.of();
         };
-    SeasonMatchImporter importer = new SeasonMatchImporter(provider);
+    RecordingMatchRepository repository = new RecordingMatchRepository();
+    SeasonMatchImporter importer = new SeasonMatchImporter(provider, repository);
 
     assertThatThrownBy(() -> importer.importSeason(2026)).isSameAs(failure);
     assertThat(requestedRounds).containsExactly(1, 2, 3);
+    assertThat(repository.findAll()).isEmpty();
   }
 
   private List<Integer> roundsOneThroughThirty() {
@@ -92,6 +98,21 @@ class SeasonMatchImporterTest {
           null,
           MatchStatus.SCHEDULED,
           null);
+    }
+  }
+
+  private static final class RecordingMatchRepository implements MatchRepository {
+
+    private List<Match> matches = List.of();
+
+    @Override
+    public void saveAll(List<Match> matches) {
+      this.matches = List.copyOf(matches);
+    }
+
+    @Override
+    public List<Match> findAll() {
+      return matches;
     }
   }
 }

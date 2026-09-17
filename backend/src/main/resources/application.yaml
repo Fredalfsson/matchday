@@ -8,8 +8,15 @@ spring:
         connect-timeout: 3s
         read-timeout: 10s
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
   flyway:
     enabled: true
 management:

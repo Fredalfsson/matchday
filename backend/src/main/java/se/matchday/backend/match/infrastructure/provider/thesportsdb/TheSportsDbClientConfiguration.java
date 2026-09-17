@@ -6,6 +6,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.service.registry.ImportHttpServices;
 import se.matchday.backend.match.application.MatchDataProvider;
+import se.matchday.backend.match.application.MatchRepository;
 import se.matchday.backend.match.application.SeasonMatchImporter;
 
 @Configuration(proxyBeanMethods = false)
@@ -28,7 +29,8 @@ class TheSportsDbClientConfiguration {
   }
 
   @Bean
-  SeasonMatchImporter seasonMatchImporter(MatchDataProvider matchDataProvider) {
-    return new SeasonMatchImporter(matchDataProvider);
+  SeasonMatchImporter seasonMatchImporter(
+      MatchDataProvider matchDataProvider, MatchRepository matchRepository) {
+    return new SeasonMatchImporter(matchDataProvider, matchRepository);
   }
 }
