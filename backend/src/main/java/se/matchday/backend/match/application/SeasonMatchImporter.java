@@ -1,0 +1,31 @@
+package se.matchday.backend.match.application;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import se.matchday.backend.match.domain.Match;
+
+public final class SeasonMatchImporter {
+
+  private static final int FIRST_ROUND = 1;
+  private static final int LAST_ROUND = 30;
+
+  private final MatchDataProvider matchDataProvider;
+
+  public SeasonMatchImporter(MatchDataProvider matchDataProvider) {
+    this.matchDataProvider =
+        Objects.requireNonNull(matchDataProvider, "matchDataProvider must not be null");
+  }
+
+  public List<Match> importSeason(int season) {
+    if (season < 1) {
+      throw new IllegalArgumentException("season must be a positive integer");
+    }
+
+    List<Match> matches = new ArrayList<>();
+    for (int round = FIRST_ROUND; round <= LAST_ROUND; round++) {
+      matches.addAll(matchDataProvider.fetchRound(season, round));
+    }
+    return List.copyOf(matches);
+  }
+}
