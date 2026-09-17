@@ -31,7 +31,7 @@ export default function Card({
         </p>
       </Wrapper>
       <Link
-        href={isAuthenticated ? `/messages/${id}` : '/login'}
+        href={isAuthenticated ? `/conversation/${id}` : '/login'}
         className='dark:bg-primary-dark bg-primary/50 rounded-full p-3 text-center mb-auto mt-auto text-sm font-semibold'
       >
         {hasConversation ? 'Gå med i konversation' : 'Skapa konversation'}
