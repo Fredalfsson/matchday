@@ -3,8 +3,8 @@ package se.matchday.backend.match.infrastructure.provider.thesportsdb;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
@@ -38,7 +38,7 @@ class TheSportsDbMatchDataProviderTest {
                 "134724",
                 "Sirius",
                 LocalDate.of(2026, 4, 4),
-                LocalTime.of(13, 0),
+                Instant.parse("2026-04-04T13:00:00Z"),
                 0,
                 3,
                 MatchStatus.FINISHED,

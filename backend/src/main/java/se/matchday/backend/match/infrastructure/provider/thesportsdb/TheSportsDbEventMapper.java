@@ -1,8 +1,11 @@
 package se.matchday.backend.match.infrastructure.provider.thesportsdb;
 
 import java.time.DateTimeException;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalTime;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Locale;
 import org.jspecify.annotations.Nullable;
 import se.matchday.backend.match.domain.Match;
@@ -19,29 +22,32 @@ final class TheSportsDbEventMapper {
     String homeTeamName = required(event.homeTeamName(), "strHomeTeam", externalId);
     String awayTeamId = required(event.awayTeamId(), "idAwayTeam", externalId);
     String awayTeamName = required(event.awayTeamName(), "strAwayTeam", externalId);
-    LocalDate kickoffDate = date(event.eventDate(), "dateEvent", externalId);
-    LocalTime kickoffTime = optionalTime(event.eventTime(), "strTime", externalId);
+    LocalDate scheduledDate = date(event.eventDate(), "dateEvent", externalId);
+    Instant kickoffAt = optionalUtcTimestamp(event.timestamp(), "strTimestamp", externalId);
     Integer homeScore = optionalNonNegativeInteger(event.homeScore(), "intHomeScore", externalId);
     Integer awayScore = optionalNonNegativeInteger(event.awayScore(), "intAwayScore", externalId);
 
-    requireCompleteScore(homeScore, awayScore, externalId);
     MatchStatus status = status(event.status(), event.postponed());
-    requireConsistentResult(status, homeScore, externalId);
 
-    return new Match(
-        externalId,
-        season,
-        round,
-        homeTeamId,
-        homeTeamName,
-        awayTeamId,
-        awayTeamName,
-        kickoffDate,
-        kickoffTime,
-        homeScore,
-        awayScore,
-        status,
-        optionalText(event.venueName()));
+    try {
+      return new Match(
+          externalId,
+          season,
+          round,
+          homeTeamId,
+          homeTeamName,
+          awayTeamId,
+          awayTeamName,
+          scheduledDate,
+          kickoffAt,
+          homeScore,
+          awayScore,
+          status,
+          optionalText(event.venueName()));
+    } catch (IllegalArgumentException exception) {
+      throw new TheSportsDbMappingException(
+          "Invalid TheSportsDB event " + externalId + ": " + exception.getMessage(), exception);
+    }
   }
 
   private String required(@Nullable String value, String providerField) {
@@ -96,15 +102,20 @@ final class TheSportsDbEventMapper {
     }
   }
 
-  private @Nullable LocalTime optionalTime(
+  private @Nullable Instant optionalUtcTimestamp(
       @Nullable String value, String providerField, String eventId) {
     if (value == null || value.isBlank()) {
       return null;
     }
+    String timestamp = value.strip();
     try {
-      return LocalTime.parse(value.strip());
-    } catch (DateTimeException exception) {
-      throw invalid(eventId, providerField, "must use ISO time format", exception);
+      return OffsetDateTime.parse(timestamp).toInstant();
+    } catch (DateTimeException offsetException) {
+      try {
+        return LocalDateTime.parse(timestamp).toInstant(ZoneOffset.UTC);
+      } catch (DateTimeException localException) {
+        throw invalid(eventId, providerField, "must use ISO-8601 timestamp format", localException);
+      }
     }
   }
 
@@ -117,29 +128,9 @@ final class TheSportsDbEventMapper {
     }
     return switch (providerStatus.strip().toUpperCase(Locale.ROOT)) {
       case "NS", "TBD" -> MatchStatus.SCHEDULED;
-      case "FT" -> MatchStatus.FINISHED;
+      case "FT", "AET", "PEN" -> MatchStatus.FINISHED;
       default -> MatchStatus.UNKNOWN;
     };
-  }
-
-  private void requireCompleteScore(
-      @Nullable Integer homeScore, @Nullable Integer awayScore, String eventId) {
-    if ((homeScore == null) != (awayScore == null)) {
-      throw new TheSportsDbMappingException(
-          "Invalid TheSportsDB event " + eventId + ": both score fields must be present or absent");
-    }
-  }
-
-  private void requireConsistentResult(
-      MatchStatus status, @Nullable Integer homeScore, String eventId) {
-    if (status == MatchStatus.FINISHED && homeScore == null) {
-      throw new TheSportsDbMappingException(
-          "Invalid TheSportsDB event " + eventId + ": a finished match must have a result");
-    }
-    if (status == MatchStatus.SCHEDULED && homeScore != null) {
-      throw new TheSportsDbMappingException(
-          "Invalid TheSportsDB event " + eventId + ": a scheduled match cannot have a result");
-    }
   }
 
   private @Nullable String optionalText(@Nullable String value) {
