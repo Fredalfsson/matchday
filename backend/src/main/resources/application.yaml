@@ -1,6 +1,12 @@
 spring:
   application:
     name: matchday
+  http:
+    serviceclient:
+      the-sports-db:
+        base-url: ${THESPORTSDB_BASE_URL:https://www.thesportsdb.com/api/v1/json}
+        connect-timeout: 3s
+        read-timeout: 10s
   jpa:
     hibernate:
       ddl-auto: validate
