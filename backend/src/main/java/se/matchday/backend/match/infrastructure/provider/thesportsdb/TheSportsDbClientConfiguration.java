@@ -1,5 +1,6 @@
 package se.matchday.backend.match.infrastructure.provider.thesportsdb;
 
+import java.time.Clock;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -12,7 +13,16 @@ import se.matchday.backend.match.application.MatchDataProvider;
 class TheSportsDbClientConfiguration {
 
   @Bean
-  MatchDataProvider matchDataProvider(TheSportsDbClient client, TheSportsDbProperties properties) {
-    return new TheSportsDbMatchDataProvider(client, new TheSportsDbEventMapper(), properties);
+  TheSportsDbRequestExecutor theSportsDbRequestExecutor(TheSportsDbProperties properties) {
+    return new TheSportsDbRequestExecutor(properties, Clock.systemUTC(), Thread::sleep);
+  }
+
+  @Bean
+  MatchDataProvider matchDataProvider(
+      TheSportsDbClient client,
+      TheSportsDbProperties properties,
+      TheSportsDbRequestExecutor requestExecutor) {
+    return new TheSportsDbMatchDataProvider(
+        client, new TheSportsDbEventMapper(), properties, requestExecutor);
   }
 }

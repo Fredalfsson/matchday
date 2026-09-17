@@ -12,12 +12,17 @@ final class TheSportsDbMatchDataProvider implements MatchDataProvider {
   private final TheSportsDbClient client;
   private final TheSportsDbEventMapper mapper;
   private final TheSportsDbProperties properties;
+  private final TheSportsDbRequestExecutor requestExecutor;
 
   TheSportsDbMatchDataProvider(
-      TheSportsDbClient client, TheSportsDbEventMapper mapper, TheSportsDbProperties properties) {
+      TheSportsDbClient client,
+      TheSportsDbEventMapper mapper,
+      TheSportsDbProperties properties,
+      TheSportsDbRequestExecutor requestExecutor) {
     this.client = client;
     this.mapper = mapper;
     this.properties = properties;
+    this.requestExecutor = requestExecutor;
   }
 
   @Override
@@ -26,7 +31,9 @@ final class TheSportsDbMatchDataProvider implements MatchDataProvider {
     requirePositive(round, "round");
 
     @Nullable TheSportsDbEventsResponseDto response =
-        client.getEventsByRound(properties.apiKey(), properties.leagueId(), round, season);
+        requestExecutor.execute(
+            () ->
+                client.getEventsByRound(properties.apiKey(), properties.leagueId(), round, season));
     if (response == null) {
       throw new IllegalStateException("TheSportsDB returned an empty response body");
     }

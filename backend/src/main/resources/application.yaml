@@ -22,3 +22,7 @@ matchday:
     the-sports-db:
       api-key: ${THESPORTSDB_API_KEY:123}
       league-id: ${THESPORTSDB_LEAGUE_ID:4347}
+      minimum-request-interval: 2100ms
+      max-retries: 2
+      fallback-retry-delay: 60s
+      maximum-retry-delay: 120s

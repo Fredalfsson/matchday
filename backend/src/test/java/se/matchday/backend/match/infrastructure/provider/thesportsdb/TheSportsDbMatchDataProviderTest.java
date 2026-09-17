@@ -3,8 +3,11 @@ package se.matchday.backend.match.infrastructure.provider.thesportsdb;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
@@ -80,14 +83,30 @@ class TheSportsDbMatchDataProviderTest {
 
   @Test
   void doesNotExposeTheApiKeyWhenConfigurationIsRendered() {
-    TheSportsDbProperties properties = new TheSportsDbProperties("test-key", "4347");
+    TheSportsDbProperties properties = properties();
 
     assertThat(properties.toString()).doesNotContain("test-key").contains("apiKey=***");
   }
 
   private TheSportsDbMatchDataProvider provider(RecordingClient client) {
+    TheSportsDbProperties properties = properties();
+    TheSportsDbRequestExecutor requestExecutor =
+        new TheSportsDbRequestExecutor(
+            properties,
+            Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC),
+            ignored -> {});
     return new TheSportsDbMatchDataProvider(
-        client, new TheSportsDbEventMapper(), new TheSportsDbProperties("test-key", "4347"));
+        client, new TheSportsDbEventMapper(), properties, requestExecutor);
+  }
+
+  private TheSportsDbProperties properties() {
+    return new TheSportsDbProperties(
+        "test-key",
+        "4347",
+        Duration.ofMillis(2100),
+        2,
+        Duration.ofSeconds(60),
+        Duration.ofSeconds(120));
   }
 
   private TheSportsDbEventDto event() {
