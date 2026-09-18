@@ -16,7 +16,7 @@ public final class SeasonMatchImporter {
     this.matchRepository = matchRepository;
   }
 
-  public List<ProviderMatch> importSeason(int season) {
+  public SeasonMatchImportResult importSeason(int season) {
     if (season < 1) {
       throw new IllegalArgumentException("season must be a positive integer");
     }
@@ -27,6 +27,6 @@ public final class SeasonMatchImporter {
     }
     List<ProviderMatch> importedMatches = List.copyOf(matches);
     matchRepository.saveAll(importedMatches);
-    return importedMatches;
+    return new SeasonMatchImportResult(season, importedMatches.size());
   }
 }

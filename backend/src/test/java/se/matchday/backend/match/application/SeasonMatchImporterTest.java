@@ -19,15 +19,16 @@ class SeasonMatchImporterTest {
     RecordingMatchRepository repository = new RecordingMatchRepository();
     SeasonMatchImporter importer = new SeasonMatchImporter(provider, repository);
 
-    List<ProviderMatch> matches = importer.importSeason(2026);
+    SeasonMatchImportResult result = importer.importSeason(2026);
+    List<ProviderMatch> savedMatches = repository.savedMatches();
 
     assertThat(provider.requestedRounds()).containsExactlyElementsOf(roundsOneThroughThirty());
-    assertThat(matches)
+    assertThat(result).isEqualTo(new SeasonMatchImportResult(2026, 240));
+    assertThat(savedMatches)
         .hasSize(240)
         .allSatisfy(match -> assertThat(match.season()).isEqualTo(2026));
-    assertThat(matches).filteredOn(match -> match.round() == 1).hasSize(8);
-    assertThat(matches).filteredOn(match -> match.round() == 30).hasSize(8);
-    assertThat(repository.savedMatches()).containsExactlyElementsOf(matches);
+    assertThat(savedMatches).filteredOn(match -> match.round() == 1).hasSize(8);
+    assertThat(savedMatches).filteredOn(match -> match.round() == 30).hasSize(8);
   }
 
   @Test
