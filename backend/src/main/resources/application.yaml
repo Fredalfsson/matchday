@@ -12,11 +12,9 @@ spring:
     hibernate:
       ddl-auto: validate
     properties:
-      hibernate:
-        jdbc:
-          batch_size: 50
-        order_inserts: true
-        order_updates: true
+      "[hibernate.jdbc.batch_size]": 50
+      "[hibernate.order_inserts]": true
+      "[hibernate.order_updates]": true
   flyway:
     enabled: true
 management:
@@ -33,3 +31,15 @@ matchday:
       max-retries: 2
       fallback-retry-delay: 60s
       maximum-retry-delay: 120s
+---
+server:
+  address: ${MATCHDAY_LOCAL_SERVER_ADDRESS:127.0.0.1}
+spring:
+  config:
+    activate:
+      on-profile: local
+matchday:
+  security:
+    local:
+      username: ${MATCHDAY_LOCAL_USERNAME}
+      password: ${MATCHDAY_LOCAL_PASSWORD}
