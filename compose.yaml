@@ -1,9 +1,20 @@
 services:
   postgres:
-    image: 'postgres:18.6'
+    image: postgres:18.6
     environment:
-      - 'POSTGRES_DB=matchday'
-      - 'POSTGRES_PASSWORD=app'
-      - 'POSTGRES_USER=app'
+      POSTGRES_DB: ${POSTGRES_DB:-matchday}
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app}
     ports:
-      - '5432:5432'
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - matchday_postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  matchday_postgres_data:

@@ -1,73 +1,128 @@
-# CI och säkerhetsverifiering för backend
+# Backend CI och säkerhetskontroller
 
-Matchday håller backendens kvalitetsverifiering åtskild från säkerhetsgranskningen av beroenden.
-Det gör att vanliga lokala byggen förblir reproducerbara utan åtkomst till en extern
-sårbarhetsdatabas eller en lagrad hemlighet.
+Detta dokument beskriver backendens automatiserade kvalitets- och säkerhetskontroller. Målgruppen
+är utvecklare som arbetar i kodbasen samt granskare som behöver bedöma hur ändringar verifieras
+innan de integreras i `main`.
+
+## Översikt
+
+Backend använder två separata GitHub Actions-arbetsflöden:
+
+| Arbetsflöde | Syfte | Utlösare |
+| --- | --- | --- |
+| `Backend CI` | Bygg, tester, kodformat, testtäckning och OpenAPI-kontrakt | Pull request mot `main`, push till `main`, manuell körning |
+| `Backend Security` | Sårbarhetsanalys av Maven-beroenden | Pull request mot `main`, push till `main`, måndagar 06.00 UTC, manuell körning |
+
+Sårbarhetsanalysen är separerad från det ordinarie bygget eftersom den kräver åtkomst till NVD och
+en API-nyckel. Resultaten visas därför som separata status checks för kodverifiering,
+API-kontrakt och beroenden.
 
 ## Backend CI
 
-Arbetsflödet `Backend CI` körs för pull requests mot `main`, pushar till `main` och manuella
-körningar. Det kör:
+Konfiguration: [`.github/workflows/backend.yml`](../.github/workflows/backend.yml)
+
+Arbetsflödet innehåller två oberoende jobb. Ett fel i API-kontraktet kan därför skiljas från ett
+kompilerings- eller testfel.
+
+### Backend verification
+
+Jobbet använder Temurin JDK 25 och kör följande kommando från `backend/`:
 
 ```bash
-cd backend
 ./mvnw --batch-mode --no-transfer-progress verify
 ```
 
-Mavens `verify`-livscykel omfattar kompilering, automatiserade tester, Spotless-kontroll,
-generering av JaCoCo-rapport, kvalitetsgrinden på 70 procents radtäckning och paketering av
-applikationen. Arbetsflödet laddar upp test- och täckningsrapporter även när verifieringen
-misslyckas.
+Verifieringen omfattar:
 
-Arbetsflödet har endast läsbehörighet till repot, sparar inte Git-inloggningsuppgifter och ändrar
-eller committar aldrig källkod.
+- kompilering och paketering
+- enhets- och integrationstester
+- kodformat med Spotless och Google Java Format
+- JaCoCo-rapport och en kvalitetsgrind på minst 70 procent linjetäckning
+- Testcontainers-baserade integrationstester mot PostgreSQL
 
-## Säkerhetsgranskning av backendens beroenden
+Följande rapporter laddas upp som GitHub Actions-artifacts även när jobbet misslyckas:
 
-Arbetsflödet `Backend Security` körs för pull requests mot `main`, pushar till `main`, varje måndag
-och vid manuell start. Den kör OWASP Dependency-Check uttryckligen och misslyckas om ett beroende
-med CVSS-värde 7 eller högre upptäcks. Genom att köra kontrollen för varje pull request rapporterar
-en framtida obligatorisk branch protection-kontroll alltid ett resultat i stället för att förbli
-väntande.
+- `backend/target/surefire-reports/`
+- `backend/target/site/jacoco/`
 
-Arbetsflödet kräver följande repohemlighet (repository secret) i GitHub Actions:
+Rapporterna behålls i sju dagar.
+
+### OpenAPI lint
+
+Jobbet validerar [`docs/openapi.yaml`](openapi.yaml) med Redocly CLI. Kontrollen omfattar giltig
+OpenAPI-struktur, schema-referenser och Redoclys rekommenderade kontraktsregler. Redocly används
+endast i utvecklings- och CI-flödet och påverkar inte Spring Boot-applikationens runtime-beroenden.
+
+Arbetsflödet använder Node.js 24 och en exakt version av Redocly CLI för att begränsa variationen
+mellan körningar. Den lokala motsvarigheten körs från projektets rotkatalog:
+
+```bash
+REDOCLY_TELEMETRY=off \
+REDOCLY_SUPPRESS_UPDATE_NOTICE=true \
+npx --yes @redocly/cli@2.45.0 lint docs/openapi.yaml
+```
+
+## Backend Security
+
+Konfiguration: [`.github/workflows/backend-security.yml`](../.github/workflows/backend-security.yml)
+
+Jobbet `Backend dependency audit` använder OWASP Dependency-Check för att analysera
+Maven-beroenden mot National Vulnerability Database. Säkerhetsjobbet misslyckas när ett beroende
+får CVSS 7 eller högre. Den schemalagda veckokörningen gör att nya sårbarheter kan upptäckas även om
+beroendefilerna inte har ändrats.
+
+Dependency-Check körs med tester avstängda eftersom backendens tester redan hanteras av
+`Backend verification`. En HTML-rapport laddas upp som en GitHub Actions-artifact och behålls i
+sju dagar:
+
+```text
+backend/target/dependency-check-report.html
+```
+
+### NVD API-nyckel
+
+Arbetsflödet läser följande GitHub Actions repository secret:
 
 ```text
 NVD_API_KEY
 ```
 
-Begär en kostnadsfri nyckel via
-[National Vulnerability Database](https://nvd.nist.gov/developers/request-an-api-key) och lägg till
-den under repots **Settings > Secrets and variables > Actions**. Maven-pluginen läser nyckeln från
-miljön och den får aldrig committas till repot.
+Nyckeln används av OWASP Dependency-Check för anrop till National Vulnerability Database och
+lagras inte i versionshanteringen. Arbetsflödet avbryts om nyckeln saknas.
 
-Dependency-Check-data cachelagras mellan workflowkörningar eftersom den första hämtningen från
-NVD kan vara stor. Om `NVD_API_KEY` saknas misslyckas arbetsflödet uttryckligen i stället för att
-säkerhetskontrollen hoppas över utan varning.
+En kostnadsfri nyckel kan begäras via
+[National Vulnerability Database](https://nvd.nist.gov/developers/request-an-api-key). Lägg till
+den som en repository secret under **Settings > Secrets and variables > Actions** i GitHub. Namnet
+ska vara exakt `NVD_API_KEY`.
 
-Det nuvarande teamflödet utgår från branches i samma repository. GitHub skickar inte vanliga
-Actions repository secrets till workflows som startas från forks eller av Dependabot. Innan
-externa fork-baserade bidrag tillåts eller Dependabot aktiveras behöver teamet därför besluta om en
-separat secret- eller workflowstrategi. Använd inte `pull_request_target` för att exponera en secret
-för kod från en obetrodd pull request.
+NVD-data cachelagras veckovis och cache-nyckeln inkluderar en hash av `backend/pom.xml`. Det
+minskar antalet API-anrop utan att en äldre cache knyts permanent till ändrade beroenden.
 
-## Skydd för pull requests
+### Exekveringskontext
 
-När båda arbetsflödena har körts framgångsrikt minst en gång konfigureras branch protection för
-`main` med följande obligatoriska kontroller före merge:
+Teamets arbetsflöde använder branches i samma GitHub-repository. GitHub lämnar inte ut repository
+secrets till körningar från forks eller Dependabot; sådana körningar stoppas därför när
+`NVD_API_KEY` verifieras. Arbetsflödet använder inte `pull_request_target`.
+
+## Minsta behörighet och leveranskedja
+
+Båda arbetsflödena har endast `contents: read`. Checkout-steget använder
+`persist-credentials: false`, vilket förhindrar att GitHub-tokenet sparas i den lokala
+Git-konfigurationen efter checkout.
+
+Varje GitHub Action anges med ett fullständigt commit-SHA-värde. Releaseversionen står i en
+kommentar vid respektive SHA för att göra versionsvalet granskningsbart.
+
+Maven Wrapper låser Maven-versionen och verifierar den nedladdade distributionen med SHA-256.
+Version och checksumma finns i `backend/.mvn/wrapper/maven-wrapper.properties`.
+
+## Status checks
+
+Arbetsflödena publicerar följande status checks:
 
 - `Backend verification`
+- `OpenAPI lint`
 - `Backend dependency audit`
 
-Kräv pull request och minst en godkännande review enligt teamets överenskomna arbetssätt. Det
-exakta skyddet konfigureras i GitHub och ska hållas i linje med detta dokument.
-
-## Leveranskedjekontroller för GitHub Actions
-
-Varje GitHub Action är pinnad till ett fullständigt commit-SHA och motsvarande releaseversion
-anges i en kommentar. En uppdatering kräver därför att releasen granskas och att både SHA-värdet
-och versionskommentaren uppdateras.
-
-Maven Wrapper pinnar Maven-versionen och verifierar den nedladdade distributionen mot en SHA-256-
-checksumma. När Maven-versionen uppdateras måste även checksumman hämtas från en verifierad
-Apache-release och uppdateras i `backend/.mvn/wrapper/maven-wrapper.properties`.
+Kontrollerna redovisar backendverifiering, API-kontrakt och beroenderisker separat i varje pull
+request mot `main`.

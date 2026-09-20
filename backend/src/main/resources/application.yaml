@@ -1,6 +1,9 @@
 spring:
   application:
     name: matchday
+  docker:
+    compose:
+      file: ../compose.yaml
   http:
     serviceclient:
       the-sports-db:
