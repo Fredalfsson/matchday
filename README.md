@@ -19,6 +19,7 @@ Next.js, TypeScript, Tailwind CSS.
 matchday/
 ├── .github/workflows/    CI
 ├── backend/              Spring Boot-applikationen
+├── docs/                 Förklarande projekt- och processdokumentation
 ├── frontend/             Next.js-applikationen
 ├── compose.yaml          Postgres för lokal utveckling
 └── README.md
@@ -90,6 +91,23 @@ Backend returnerar matcherna i en stabil standardordning:
 
 Frontend kan fortfarande filtrera eller presentera kommande och spelade matcher på det sätt
 som passar gränssnittet.
+
+### Verifiera backend
+
+Kör samma kvalitetskontroller lokalt som i backendens CI-pipeline:
+
+```bash
+cd backend
+./mvnw --batch-mode --no-transfer-progress verify
+```
+
+Kommandot kör tester, kodformatkontroll, JaCoCo med minst 70 procent linjetäckning och bygger
+applikationspaketet. OWASP Dependency-Check körs separat i GitHub Actions. Projektets
+säkerhetsworkflow kräver en `NVD_API_KEY` för stabil och förutsägbar åtkomst till NVD:s externa
+sårbarhetsdata.
+
+Backendens CI- och säkerhetskontroller, repository secret och avsedda branch protection-regler
+beskrivs i [`docs/BACKEND_CI.md`](docs/BACKEND_CI.md).
 
 ### Frontend
 ..

@@ -28,8 +28,8 @@
 	</scm>
 	<properties>
 		<java.version>25</java.version>
-		<jacoco.version>0.8.14</jacoco.version>
-		<spotless.version>3.9.0</spotless.version>
+		<jacoco.version>0.8.15</jacoco.version>
+		<spotless.version>3.10.2</spotless.version>
 		<dependency-check.version>13.0.0</dependency-check.version>
 	</properties>
 	<dependencies>
@@ -176,8 +176,7 @@
 										<limit>
 											<counter>LINE</counter>
 											<value>COVEREDRATIO</value>
-											<!-- TODO: höj till 0.70 när vi har implementerat tester -->
-											<minimum>0.00</minimum>
+											<minimum>0.70</minimum>
 										</limit>
 									</limits>
 								</rule>
@@ -210,7 +209,7 @@
 				<version>${dependency-check.version}</version>
 				<configuration>
 					<failBuildOnCVSS>7</failBuildOnCVSS>
-					<nvdApiKey>${env.NVD_API_KEY}</nvdApiKey>
+					<nvdApiKeyEnvironmentVariable>NVD_API_KEY</nvdApiKeyEnvironmentVariable>
 				</configuration>
 			</plugin>
 		</plugins>
