@@ -114,6 +114,12 @@ inget medan anropet pågår utan skriver svaret först när importen är klar. O
 med `429 Too Many Requests` väntar backend enligt `Retry-After` innan den försöker igen, vilket
 kan förlänga körtiden. Återförsök och eventuella fel visas i terminalen där backend körs.
 
+Alla 240 matcher finns inte nödvändigtvis hos providern när säsongens spelschema börjar
+fastställas. Importen sparar därför de matcher som finns och kan köras igen för att fylla på nya
+matcher eller uppdatera redan lagrade matcher. Tomma och ofullständiga omgångar är tillåtna och
+raderar aldrig befintliga data. Backend avvisar däremot matcher för fel säsong eller omgång,
+duplicerade externa match-ID:n och fler än åtta matcher i samma omgång.
+
 Integrationen använder TheSportsDB v1 och standardnyckeln `123`. En annan nyckel anges med
 miljövariabeln `THESPORTSDB_API_KEY`.
 

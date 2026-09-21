@@ -54,7 +54,7 @@ class SeasonMatchImporterTest {
           if (round == 3) {
             throw failure;
           }
-          return List.of();
+          return validRound(season, round);
         };
     RecordingMatchRepository repository = new RecordingMatchRepository();
     SeasonMatchImporter importer = new SeasonMatchImporter(provider, repository);
@@ -64,42 +64,169 @@ class SeasonMatchImporterTest {
     assertThat(repository.savedMatches()).isEmpty();
   }
 
+  @Test
+  void rejectsMatchesFromAnotherSeasonWithoutSavingAnything() {
+    RecordingMatchDataProvider provider =
+        new RecordingMatchDataProvider(
+            (season, round) ->
+                round == 3
+                    ? withFirstMatch(validRound(season, round), match(season + 1, round, 1))
+                    : validRound(season, round));
+    RecordingMatchRepository repository = new RecordingMatchRepository();
+    SeasonMatchImporter importer = new SeasonMatchImporter(provider, repository);
+
+    assertThatThrownBy(() -> importer.importSeason(2026))
+        .isInstanceOf(InvalidSeasonMatchDataException.class)
+        .hasMessage(
+            "Provider returned season 2027 for requested season 2026 in round 3 (event event-3-1)");
+    assertThat(provider.requestedRounds()).containsExactly(1, 2, 3);
+    assertThat(repository.savedMatches()).isEmpty();
+  }
+
+  @Test
+  void rejectsMatchesFromAnotherRoundWithoutSavingAnything() {
+    RecordingMatchDataProvider provider =
+        new RecordingMatchDataProvider(
+            (season, round) ->
+                round == 3
+                    ? withFirstMatch(validRound(season, round), match(season, round + 1, 1))
+                    : validRound(season, round));
+    RecordingMatchRepository repository = new RecordingMatchRepository();
+    SeasonMatchImporter importer = new SeasonMatchImporter(provider, repository);
+
+    assertThatThrownBy(() -> importer.importSeason(2026))
+        .isInstanceOf(InvalidSeasonMatchDataException.class)
+        .hasMessage("Provider returned round 4 for requested round 3 (event event-4-1)");
+    assertThat(provider.requestedRounds()).containsExactly(1, 2, 3);
+    assertThat(repository.savedMatches()).isEmpty();
+  }
+
+  @Test
+  void rejectsDuplicateExternalMatchIdsWithoutSavingAnything() {
+    RecordingMatchDataProvider provider =
+        new RecordingMatchDataProvider(
+            (season, round) ->
+                round == 2
+                    ? withFirstMatch(
+                        validRound(season, round), match("event-1-1", season, round, 1))
+                    : validRound(season, round));
+    RecordingMatchRepository repository = new RecordingMatchRepository();
+    SeasonMatchImporter importer = new SeasonMatchImporter(provider, repository);
+
+    assertThatThrownBy(() -> importer.importSeason(2026))
+        .isInstanceOf(InvalidSeasonMatchDataException.class)
+        .hasMessage("Provider returned duplicate externalMatchId event-1-1 for season 2026");
+    assertThat(provider.requestedRounds()).containsExactly(1, 2);
+    assertThat(repository.savedMatches()).isEmpty();
+  }
+
+  @Test
+  void importsAvailableMatchesWhenTheSeasonScheduleIsIncomplete() {
+    RecordingMatchDataProvider provider =
+        new RecordingMatchDataProvider(
+            (season, round) ->
+                switch (round) {
+                  case 1 -> validRound(season, round);
+                  case 2 -> validRound(season, round).subList(0, 4);
+                  default -> List.of();
+                });
+    RecordingMatchRepository repository = new RecordingMatchRepository();
+    SeasonMatchImporter importer = new SeasonMatchImporter(provider, repository);
+
+    SeasonMatchImportResult result = importer.importSeason(2026);
+
+    assertThat(result).isEqualTo(new SeasonMatchImportResult(2026, 12));
+    assertThat(provider.requestedRounds()).containsExactlyElementsOf(roundsOneThroughThirty());
+    assertThat(repository.savedMatches()).hasSize(12);
+  }
+
+  @Test
+  void rejectsMoreThanEightMatchesInARoundWithoutSavingAnything() {
+    RecordingMatchDataProvider provider =
+        new RecordingMatchDataProvider(
+            (season, round) ->
+                round == 3
+                    ? IntStream.rangeClosed(1, 9)
+                        .mapToObj(matchNumber -> match(season, round, matchNumber))
+                        .toList()
+                    : validRound(season, round));
+    RecordingMatchRepository repository = new RecordingMatchRepository();
+    SeasonMatchImporter importer = new SeasonMatchImporter(provider, repository);
+
+    assertThatThrownBy(() -> importer.importSeason(2026))
+        .isInstanceOf(InvalidSeasonMatchDataException.class)
+        .hasMessage("Provider returned 9 matches for season 2026 round 3; maximum is 8");
+    assertThat(provider.requestedRounds()).containsExactly(1, 2, 3);
+    assertThat(repository.savedMatches()).isEmpty();
+  }
+
   private List<Integer> roundsOneThroughThirty() {
     return IntStream.rangeClosed(1, 30).boxed().toList();
+  }
+
+  private static List<ProviderMatch> validRound(int season, int round) {
+    return IntStream.rangeClosed(1, 8)
+        .mapToObj(matchNumber -> match(season, round, matchNumber))
+        .toList();
+  }
+
+  private static List<ProviderMatch> withFirstMatch(
+      List<ProviderMatch> matches, ProviderMatch firstMatch) {
+    List<ProviderMatch> modifiedMatches = new ArrayList<>(matches);
+    modifiedMatches.set(0, firstMatch);
+    return List.copyOf(modifiedMatches);
+  }
+
+  private static ProviderMatch match(int season, int round, int matchNumber) {
+    return match("event-" + round + "-" + matchNumber, season, round, matchNumber);
+  }
+
+  private static ProviderMatch match(
+      String externalMatchId, int season, int round, int matchNumber) {
+    return new ProviderMatch(
+        externalMatchId,
+        season,
+        round,
+        "home-" + round + "-" + matchNumber,
+        "Home " + round + "-" + matchNumber,
+        "away-" + round + "-" + matchNumber,
+        "Away " + round + "-" + matchNumber,
+        LocalDate.of(season, 1, 1).plusDays(round - 1L),
+        null,
+        null,
+        null,
+        MatchStatus.SCHEDULED,
+        null);
   }
 
   private static final class RecordingMatchDataProvider implements MatchDataProvider {
 
     private final List<Integer> requestedRounds = new ArrayList<>();
+    private final RoundResponse response;
+
+    private RecordingMatchDataProvider() {
+      this(SeasonMatchImporterTest::validRound);
+    }
+
+    private RecordingMatchDataProvider(RoundResponse response) {
+      this.response = response;
+    }
 
     @Override
     public List<ProviderMatch> fetchRound(int season, int round) {
       requestedRounds.add(round);
-      return IntStream.rangeClosed(1, 8)
-          .mapToObj(matchNumber -> match(season, round, matchNumber))
-          .toList();
+      return response.apply(season, round);
     }
 
     private List<Integer> requestedRounds() {
       return List.copyOf(requestedRounds);
     }
+  }
 
-    private ProviderMatch match(int season, int round, int matchNumber) {
-      return new ProviderMatch(
-          "event-" + round + "-" + matchNumber,
-          season,
-          round,
-          "home-" + round + "-" + matchNumber,
-          "Home " + round + "-" + matchNumber,
-          "away-" + round + "-" + matchNumber,
-          "Away " + round + "-" + matchNumber,
-          LocalDate.of(season, 1, 1).plusDays(round - 1L),
-          null,
-          null,
-          null,
-          MatchStatus.SCHEDULED,
-          null);
-    }
+  @FunctionalInterface
+  private interface RoundResponse {
+
+    List<ProviderMatch> apply(int season, int round);
   }
 
   private static final class RecordingMatchRepository implements MatchRepository {
