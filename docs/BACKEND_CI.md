@@ -95,8 +95,12 @@ En kostnadsfri nyckel kan begäras via
 den som en repository secret under **Settings > Secrets and variables > Actions** i GitHub. Namnet
 ska vara exakt `NVD_API_KEY`.
 
-NVD-data cachelagras veckovis och cache-nyckeln inkluderar en hash av `backend/pom.xml`. Det
-minskar antalet API-anrop utan att en äldre cache knyts permanent till ändrade beroenden.
+NVD-data cachelagras veckovis. Om ingen kompatibel cache finns initieras databasen från
+Dependency-Check-projektets datafeed innan den uppdateras mot NVD API med repositoryts
+`NVD_API_KEY`. Uppdateringen och själva beroendeanalysen körs som separata steg, vilket gör att en
+färdiguppdaterad databas kan cachelagras även om analysen därefter hittar en sårbarhet och stoppar
+bygget. Cacheversionen följer Dependency-Checks huvudversion och ska ändras vid en
+inkompatibel uppgradering.
 
 ### Exekveringskontext
 

@@ -16,6 +16,8 @@ permissions:
 
 env:
   JAVA_VERSION: "25"
+  DEPENDENCY_CHECK_CACHE_VERSION: "13"
+  DEPENDENCY_CHECK_BOOTSTRAP_FEED: "https://dependency-check.github.io/DependencyCheck_Builder/nvd_cache/nvdcve-{0}.json.gz"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -25,7 +27,7 @@ jobs:
   dependency-check:
     name: Backend dependency audit
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 90
 
     defaults:
       run:
@@ -56,25 +58,47 @@ jobs:
           fi
 
       - name: Set Dependency-Check cache key
-        id: dependency-check-cache
+        id: dependency-check-date
         run: echo "week=$(date -u +'%G-W%V')" >> "${GITHUB_OUTPUT}"
 
       - name: Restore Dependency-Check data cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: dependency-check-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.dependency-check
-          key: dependency-check-data-${{ runner.os }}-${{ steps.dependency-check-cache.outputs.week }}-${{ hashFiles('backend/pom.xml') }}
+          key: dependency-check-data-${{ runner.os }}-v${{ env.DEPENDENCY_CHECK_CACHE_VERSION }}-${{ steps.dependency-check-date.outputs.week }}
           restore-keys: |
-            dependency-check-data-${{ runner.os }}-
+            dependency-check-data-${{ runner.os }}-v${{ env.DEPENDENCY_CHECK_CACHE_VERSION }}-
 
-      - name: Run backend dependency audit
+      - name: Bootstrap Dependency-Check data
+        if: steps.dependency-check-cache.outputs.cache-matched-key == ''
+        run: |
+          ./mvnw --batch-mode --no-transfer-progress dependency-check:update-only \
+            -DdataDirectory="${HOME}/.dependency-check" \
+            -DnvdDatafeedUrl="${DEPENDENCY_CHECK_BOOTSTRAP_FEED}"
+
+      - name: Update Dependency-Check data
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: |
+          ./mvnw --batch-mode --no-transfer-progress dependency-check:update-only \
+            -DdataDirectory="${HOME}/.dependency-check" \
+            -DnvdApiDelay=3500 \
+            -DnvdValidForHours=0
+
+      - name: Save Dependency-Check data cache
+        if: steps.dependency-check-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.dependency-check
+          key: ${{ steps.dependency-check-cache.outputs.cache-primary-key }}
+
+      - name: Run backend dependency audit
         run: |
           ./mvnw --batch-mode --no-transfer-progress dependency-check:check \
             -DskipTests \
             -DdataDirectory="${HOME}/.dependency-check" \
-            -DnvdApiDelay=3500 \
+            -DautoUpdate=false \
             -Dformat=HTML
 
       - name: Upload dependency audit report
