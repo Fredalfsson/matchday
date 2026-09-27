@@ -41,7 +41,7 @@ class MatchControllerIntegrationTest {
 
   @BeforeEach
   void clearMatches() {
-    jdbcTemplate.update("TRUNCATE TABLE matches");
+    jdbcTemplate.update("TRUNCATE TABLE circle_memberships, circles, matches");
   }
 
   @Test
