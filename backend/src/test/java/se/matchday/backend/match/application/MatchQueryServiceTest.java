@@ -85,5 +85,10 @@ class MatchQueryServiceTest {
     public List<Match> findAll() {
       return matches;
     }
+
+    @Override
+    public boolean existsById(UUID matchId) {
+      return matches.stream().anyMatch(match -> match.id().equals(matchId));
+    }
   }
 }

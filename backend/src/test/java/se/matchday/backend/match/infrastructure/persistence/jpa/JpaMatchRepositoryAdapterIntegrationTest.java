@@ -5,10 +5,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
 import se.matchday.backend.TestcontainersConfiguration;
 import se.matchday.backend.match.application.MatchRepository;
 import se.matchday.backend.match.application.ProviderMatch;
@@ -20,10 +24,26 @@ import se.matchday.backend.match.domain.MatchStatus;
 class JpaMatchRepositoryAdapterIntegrationTest {
 
   private final MatchRepository repository;
+  private final JdbcTemplate jdbcTemplate;
 
   @Autowired
-  JpaMatchRepositoryAdapterIntegrationTest(MatchRepository repository) {
+  JpaMatchRepositoryAdapterIntegrationTest(MatchRepository repository, JdbcTemplate jdbcTemplate) {
     this.repository = repository;
+    this.jdbcTemplate = jdbcTemplate;
+  }
+
+  @BeforeEach
+  void clearDatabaseBeforeTest() {
+    clearDatabase();
+  }
+
+  @AfterEach
+  void clearDatabaseAfterTest() {
+    clearDatabase();
+  }
+
+  private void clearDatabase() {
+    jdbcTemplate.update("TRUNCATE TABLE circle_memberships, circles, matches");
   }
 
   @Test
@@ -65,6 +85,16 @@ class JpaMatchRepositoryAdapterIntegrationTest {
         .singleElement()
         .extracting((Match match) -> match.id())
         .isEqualTo(initiallyStored.id());
+  }
+
+  @Test
+  void reportsWhetherAMatchExistsById() {
+    repository.saveAll(List.of(scheduledMatch("event-exists", 1, LocalDate.of(2026, 4, 4))));
+    UUID storedMatchId = repository.findAll().getFirst().id();
+
+    assertThat(repository.existsById(storedMatchId)).isTrue();
+    assertThat(repository.existsById(UUID.fromString("00000000-0000-0000-0000-000000000099")))
+        .isFalse();
   }
 
   private ProviderMatch scheduledMatch(String externalMatchId, int round, LocalDate scheduledDate) {

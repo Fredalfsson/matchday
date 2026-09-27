@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 import se.matchday.backend.match.application.MatchRepository;
@@ -59,5 +60,11 @@ class JpaMatchRepositoryAdapter implements MatchRepository {
   @Transactional(readOnly = true)
   public List<Match> findAll() {
     return repository.findAll().stream().map(entity -> entity.toDomain()).toList();
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public boolean existsById(UUID matchId) {
+    return repository.existsById(Objects.requireNonNull(matchId, "matchId must not be null"));
   }
 }

@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 import se.matchday.backend.match.domain.Match;
@@ -241,6 +242,11 @@ class SeasonMatchImporterTest {
     @Override
     public List<Match> findAll() {
       return List.of();
+    }
+
+    @Override
+    public boolean existsById(UUID matchId) {
+      return false;
     }
 
     List<ProviderMatch> savedMatches() {
