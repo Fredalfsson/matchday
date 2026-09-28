@@ -2,6 +2,7 @@ package se.matchday.backend.circle.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -11,8 +12,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,8 +30,11 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import se.matchday.backend.TestcontainersConfiguration;
@@ -41,29 +51,28 @@ import se.matchday.backend.match.domain.MatchStatus;
 @SpringBootTest
 class CircleControllerIntegrationTest {
 
+  private static final String USERNAME = "circle-user";
+  private static final String SECOND_USERNAME = "second-circle-user";
+  private static final String UNMAPPED_USERNAME = "unmapped-circle-user";
   private static final UUID USER_ID = UUID.fromString("20000000-0000-0000-0000-000000000001");
+  private static final UUID SECOND_USER_ID =
+      UUID.fromString("20000000-0000-0000-0000-000000000002");
 
   private final MockMvc mockMvc;
   private final MatchRepository matchRepository;
   private final JdbcTemplate jdbcTemplate;
-  private final TestCurrentUser currentUser;
 
   @Autowired
   CircleControllerIntegrationTest(
-      MockMvc mockMvc,
-      MatchRepository matchRepository,
-      JdbcTemplate jdbcTemplate,
-      TestCurrentUser currentUser) {
+      MockMvc mockMvc, MatchRepository matchRepository, JdbcTemplate jdbcTemplate) {
     this.mockMvc = mockMvc;
     this.matchRepository = matchRepository;
     this.jdbcTemplate = jdbcTemplate;
-    this.currentUser = currentUser;
   }
 
   @BeforeEach
   void prepareTest() {
     clearDatabase();
-    currentUser.authenticateAs(USER_ID);
   }
 
   @AfterEach
@@ -87,10 +96,9 @@ class CircleControllerIntegrationTest {
   }
 
   @Test
-  @WithMockUser
+  @WithMockUser(username = UNMAPPED_USERNAME)
   void rejectsCreationWhenTheAuthenticatedIdentityCannotBeResolved() throws Exception {
     UUID matchId = storeMatch();
-    currentUser.clear();
 
     mockMvc
         .perform(post("/api/v1/matches/{matchId}/circle", matchId).with(csrf()))
@@ -107,7 +115,7 @@ class CircleControllerIntegrationTest {
   }
 
   @Test
-  @WithMockUser
+  @WithMockUser(username = USERNAME)
   void createsCircleAndCreatorMembershipAtomically() throws Exception {
     UUID matchId = storeMatch();
 
@@ -120,7 +128,8 @@ class CircleControllerIntegrationTest {
         .andExpect(jsonPath("$.matchId").value(matchId.toString()))
         .andExpect(jsonPath("$.createdAt").isNotEmpty())
         .andExpect(jsonPath("$.membershipActive").value(true))
-        .andExpect(jsonPath("$.createdByUserId").doesNotExist());
+        .andExpect(jsonPath("$.createdByUserId").doesNotExist())
+        .andExpect(jsonPath("$.email").doesNotExist());
 
     assertThat(rowCount("circles")).isOne();
     assertThat(rowCount("circle_memberships")).isOne();
@@ -146,7 +155,7 @@ class CircleControllerIntegrationTest {
   }
 
   @Test
-  @WithMockUser
+  @WithMockUser(username = USERNAME)
   void rejectsAnUnknownMatch() throws Exception {
     UUID unknownMatchId = UUID.fromString("10000000-0000-0000-0000-000000000099");
 
@@ -165,7 +174,7 @@ class CircleControllerIntegrationTest {
   }
 
   @Test
-  @WithMockUser
+  @WithMockUser(username = USERNAME)
   void rejectsASecondCircleForTheSameMatch() throws Exception {
     UUID matchId = storeMatch();
     mockMvc
@@ -185,6 +194,98 @@ class CircleControllerIntegrationTest {
 
     assertThat(rowCount("circles")).isOne();
     assertThat(rowCount("circle_memberships")).isOne();
+  }
+
+  @Test
+  @WithMockUser(username = USERNAME)
+  void rejectsCreationWithoutCsrfProtection() throws Exception {
+    UUID matchId = storeMatch();
+
+    mockMvc
+        .perform(post("/api/v1/matches/{matchId}/circle", matchId))
+        .andExpect(status().isForbidden());
+
+    assertNoCircleWasStored();
+  }
+
+  @Test
+  @WithMockUser(username = USERNAME)
+  void rejectsAMalformedMatchId() throws Exception {
+    storeMatch();
+
+    mockMvc
+        .perform(post("/api/v1/matches/{matchId}/circle", "not-a-uuid").with(csrf()))
+        .andExpect(status().isBadRequest());
+
+    assertNoCircleWasStored();
+  }
+
+  @Test
+  void allowsOnlyOneOfTwoConcurrentUsersToCreateTheCircle() throws Exception {
+    UUID matchId = storeMatch();
+    CountDownLatch requestsReady = new CountDownLatch(2);
+    CountDownLatch startRequests = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+
+    try {
+      Future<CreationAttempt> firstAttempt =
+          executor.submit(
+              () ->
+                  createCircleWhenReleased(
+                      matchId, USERNAME, USER_ID, requestsReady, startRequests));
+      Future<CreationAttempt> secondAttempt =
+          executor.submit(
+              () ->
+                  createCircleWhenReleased(
+                      matchId, SECOND_USERNAME, SECOND_USER_ID, requestsReady, startRequests));
+
+      assertThat(requestsReady.await(5, TimeUnit.SECONDS)).isTrue();
+      startRequests.countDown();
+
+      List<CreationAttempt> attempts =
+          List.of(firstAttempt.get(10, TimeUnit.SECONDS), secondAttempt.get(10, TimeUnit.SECONDS));
+
+      assertThat(attempts)
+          .extracting(CreationAttempt::status)
+          .containsExactlyInAnyOrder(HttpStatus.CREATED.value(), HttpStatus.CONFLICT.value());
+
+      CreationAttempt winner =
+          attempts.stream()
+              .filter(attempt -> attempt.status() == HttpStatus.CREATED.value())
+              .findFirst()
+              .orElseThrow();
+
+      assertThat(rowCount("circles")).isOne();
+      assertThat(rowCount("circle_memberships")).isOne();
+      assertThat(jdbcTemplate.queryForObject("SELECT user_id FROM circle_memberships", UUID.class))
+          .isEqualTo(winner.userId());
+    } finally {
+      startRequests.countDown();
+      executor.shutdownNow();
+      executor.awaitTermination(5, TimeUnit.SECONDS);
+    }
+  }
+
+  private CreationAttempt createCircleWhenReleased(
+      UUID matchId,
+      String username,
+      UUID userId,
+      CountDownLatch requestsReady,
+      CountDownLatch startRequests)
+      throws Exception {
+    requestsReady.countDown();
+    if (!startRequests.await(5, TimeUnit.SECONDS)) {
+      throw new IllegalStateException("Concurrent circle creation was not started in time");
+    }
+
+    int responseStatus =
+        mockMvc
+            .perform(
+                post("/api/v1/matches/{matchId}/circle", matchId).with(user(username)).with(csrf()))
+            .andReturn()
+            .getResponse()
+            .getStatus();
+    return new CreationAttempt(userId, responseStatus);
   }
 
   private UUID storeMatch() {
@@ -221,26 +322,17 @@ class CircleControllerIntegrationTest {
 
     @Bean
     @Primary
-    TestCurrentUser testCurrentUser() {
-      return new TestCurrentUser();
+    CurrentUser testCurrentUser() {
+      Map<String, UUID> userIds = Map.of(USERNAME, USER_ID, SECOND_USERNAME, SECOND_USER_ID);
+      return () -> {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+          return Optional.empty();
+        }
+        return Optional.ofNullable(userIds.get(authentication.getName()));
+      };
     }
   }
 
-  static final class TestCurrentUser implements CurrentUser {
-
-    private Optional<UUID> userId = Optional.empty();
-
-    @Override
-    public Optional<UUID> userId() {
-      return userId;
-    }
-
-    void authenticateAs(UUID userId) {
-      this.userId = Optional.of(userId);
-    }
-
-    void clear() {
-      userId = Optional.empty();
-    }
-  }
+  private record CreationAttempt(UUID userId, int status) {}
 }

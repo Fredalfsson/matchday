@@ -121,6 +121,35 @@ class JpaCircleRepositoryAdapterIntegrationTest {
         .isZero();
   }
 
+  @Test
+  void doesNotMapAnUnrelatedDatabaseConstraintToACircleConflict() {
+    UUID matchId = storeMatch();
+    jdbcTemplate.execute(
+        """
+        ALTER TABLE circles
+        ADD CONSTRAINT test_reject_circle_creator
+        CHECK (created_by_user_id <> '20000000-0000-0000-0000-000000000001')
+        """);
+
+    try {
+      assertThatThrownBy(
+              () -> circleRepository.createWithCreatorMembership(matchId, USER_ID, CREATED_AT))
+          .isInstanceOf(DataIntegrityViolationException.class)
+          .isNotInstanceOf(CircleAlreadyExistsException.class);
+    } finally {
+      jdbcTemplate.execute(
+          """
+          ALTER TABLE circles
+          DROP CONSTRAINT test_reject_circle_creator
+          """);
+    }
+
+    assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM circles", Integer.class)).isZero();
+    assertThat(
+            jdbcTemplate.queryForObject("SELECT COUNT(*) FROM circle_memberships", Integer.class))
+        .isZero();
+  }
+
   private UUID storeMatch() {
     matchRepository.saveAll(
         List.of(
