@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: Matchday API
   version: 0.1.0
-  description: API for importing and reading Allsvenskan matches and creating match circles.
+  description: API for importing and reading Allsvenskan matches and creating and reading match circles.
 servers:
   - url: http://127.0.0.1:8080
     description: Local development
@@ -39,10 +39,70 @@ paths:
       - name: matchId
         in: path
         required: true
-        description: ID of the match whose discussion circle should be created.
+        description: ID of the match whose discussion circle is addressed.
         schema:
           type: string
           format: uuid
+    get:
+      tags:
+        - Circles
+      summary: Get a match circle
+      description: >-
+        Returns the match circle and whether the authenticated user has an active membership.
+        Reading the circle does not create or activate a membership. User identifiers and email
+        addresses are not exposed.
+      operationId: getMatchCircle
+      security:
+        - localBasicAuth: []
+      responses:
+        "200":
+          description: Circle metadata with the authenticated user's membership status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Circle"
+        "400":
+          description: The matchId path parameter is not a valid UUID
+        "401":
+          description: >-
+            Authentication is required. The security layer may return this status without a body;
+            an authenticated request whose application identity cannot be resolved returns a
+            problem detail.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              example:
+                type: urn:matchday:problem:authentication-required
+                title: Authentication required
+                status: 401
+                detail: An authenticated user identity is required
+                instance: /api/v1/matches/10000000-0000-0000-0000-000000000001/circle
+        "404":
+          description: The match or its circle does not exist
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                matchNotFound:
+                  summary: Match not found
+                  value:
+                    type: urn:matchday:problem:match-not-found
+                    title: Match not found
+                    status: 404
+                    detail: Match 10000000-0000-0000-0000-000000000099 was not found
+                    instance: /api/v1/matches/10000000-0000-0000-0000-000000000099/circle
+                circleNotFound:
+                  summary: Circle not found
+                  value:
+                    type: urn:matchday:problem:circle-not-found
+                    title: Circle not found
+                    status: 404
+                    detail: >-
+                      A circle was not found for match
+                      10000000-0000-0000-0000-000000000001
+                    instance: /api/v1/matches/10000000-0000-0000-0000-000000000001/circle
     post:
       tags:
         - Circles
@@ -219,8 +279,8 @@ components:
     Circle:
       type: object
       description: >-
-        A match's discussion circle as returned after creation. User identifiers and email
-        addresses are intentionally not exposed.
+        A match's discussion circle with the authenticated user's membership status. User
+        identifiers and email addresses are intentionally not exposed.
       required:
         - id
         - matchId
@@ -238,8 +298,7 @@ components:
           format: date-time
         membershipActive:
           type: boolean
-          const: true
-          description: The creator's membership is active when creation succeeds.
+          description: Whether the authenticated user currently has an active membership.
     ProblemDetail:
       type: object
       description: RFC 9457 problem details returned for application-level API errors.

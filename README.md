@@ -6,7 +6,7 @@ säkerhetskontroller.
 
 Backend stöder manuell import och uppdatering av matchdata från TheSportsDB, ett publikt API för
 matcher som har sparats i PostgreSQL samt ett API där en autentiserad användare med en
-applikationsidentitet kan skapa en diskussionsgrupp (`circle`) för en match.
+applikationsidentitet kan skapa och läsa en diskussionsgrupp (`circle`) för en match.
 
 ## Teknik
 
@@ -83,6 +83,7 @@ Svaret är `[]` om databasen ännu inte innehåller några matcher. Fortsätt d�
 | Metod och sökväg | Åtkomst | Beskrivning |
 | --- | --- | --- |
 | `GET /api/v1/matches` | Publik | Returnerar sparade matcher |
+| `GET /api/v1/matches/{matchId}/circle` | Autentiserad med applikationsidentitet | Returnerar matchens circle och användarens medlemsstatus |
 | `POST /api/v1/matches/{matchId}/circle` | Autentiserad med applikationsidentitet | Skapar matchens circle och aktiverar skaparens medlemskap |
 | `POST /api/v1/admin/match-imports` | Rollen `MATCH_IMPORTER` | Importerar eller uppdaterar angiven säsong |
 
@@ -97,13 +98,15 @@ API-kontraktet finns i [`docs/openapi.yaml`](docs/openapi.yaml) och följer Open
 - Circle skapas först när en autentiserad användare med en tillgänglig applikationsidentitet
   startar diskussionen.
 - Skaparen blir medlem i samma transaktion som circle skapas.
-- Svaret exponerar circle-ID, match-ID, skapandetid och aktiv medlemsstatus, men inte internt
+- Circle kan läsas av en autentiserad användare. Svaret visar om den aktuella användaren har ett
+  aktivt medlemskap utan att skapa eller ändra medlemskap.
+- API-svaren exponerar circle-ID, match-ID, skapandetid och medlemsstatus, men inte internt
   användar-ID eller e-postadress.
 - Samtidiga skapandeförsök skyddas av databasens unika villkor. Ett anrop får `201 Created` och
   övriga får `409 Conflict`.
 
-API för att läsa en circle, ansluta till eller lämna den samt skicka meddelanden är ännu inte
-implementerade. Den lokala Basic Auth-profilen autentiserar administrativa importanrop men kopplar
+API för att ansluta till eller lämna en circle samt skicka meddelanden är ännu inte implementerade.
+Den lokala Basic Auth-profilen autentiserar administrativa importanrop men kopplar
 inte inloggningen till ett användar-ID i domänen. Circle-anrop kräver därför auth-modulens framtida
 `CurrentUser`-adapter. Backendens automatiserade tester använder en avgränsad testadapter så att
 arbetet med circles inte blockeras av auth-utvecklingen.
