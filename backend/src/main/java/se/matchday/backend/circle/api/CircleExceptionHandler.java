@@ -6,6 +6,7 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import se.matchday.backend.circle.application.CircleAlreadyExistsException;
+import se.matchday.backend.circle.application.CircleNotFoundException;
 import se.matchday.backend.circle.application.CurrentUserUnavailableException;
 import se.matchday.backend.circle.application.MatchNotFoundException;
 
@@ -16,6 +17,8 @@ class CircleExceptionHandler {
       URI.create("urn:matchday:problem:authentication-required");
   private static final URI MATCH_NOT_FOUND_TYPE =
       URI.create("urn:matchday:problem:match-not-found");
+  private static final URI CIRCLE_NOT_FOUND_TYPE =
+      URI.create("urn:matchday:problem:circle-not-found");
   private static final URI CIRCLE_ALREADY_EXISTS_TYPE =
       URI.create("urn:matchday:problem:circle-already-exists");
 
@@ -32,6 +35,12 @@ class CircleExceptionHandler {
         CIRCLE_ALREADY_EXISTS_TYPE,
         "Circle already exists",
         exception.getMessage());
+  }
+
+  @ExceptionHandler(CircleNotFoundException.class)
+  ProblemDetail handleCircleNotFound(CircleNotFoundException exception) {
+    return problem(
+        HttpStatus.NOT_FOUND, CIRCLE_NOT_FOUND_TYPE, "Circle not found", exception.getMessage());
   }
 
   @ExceptionHandler(CurrentUserUnavailableException.class)

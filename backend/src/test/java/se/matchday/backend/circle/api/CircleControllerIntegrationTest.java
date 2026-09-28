@@ -3,6 +3,7 @@ package se.matchday.backend.circle.api;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -246,7 +247,7 @@ class CircleControllerIntegrationTest {
           List.of(firstAttempt.get(10, TimeUnit.SECONDS), secondAttempt.get(10, TimeUnit.SECONDS));
 
       assertThat(attempts)
-          .extracting(CreationAttempt::status)
+          .extracting(attempt -> attempt.status())
           .containsExactlyInAnyOrder(HttpStatus.CREATED.value(), HttpStatus.CONFLICT.value());
 
       CreationAttempt winner =
@@ -264,6 +265,99 @@ class CircleControllerIntegrationTest {
       executor.shutdownNow();
       executor.awaitTermination(5, TimeUnit.SECONDS);
     }
+  }
+
+  @Test
+  @WithMockUser(username = USERNAME)
+  void returnsCircleMetadataWithActiveMembershipForTheCreator() throws Exception {
+    UUID matchId = storeMatch();
+    createCircle(matchId, USERNAME);
+
+    mockMvc
+        .perform(get("/api/v1/matches/{matchId}/circle", matchId))
+        .andExpect(status().isOk())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+        .andExpect(jsonPath("$.id").isNotEmpty())
+        .andExpect(jsonPath("$.matchId").value(matchId.toString()))
+        .andExpect(jsonPath("$.createdAt").isNotEmpty())
+        .andExpect(jsonPath("$.membershipActive").value(true))
+        .andExpect(jsonPath("$.createdByUserId").doesNotExist())
+        .andExpect(jsonPath("$.email").doesNotExist());
+  }
+
+  @Test
+  void returnsCircleMetadataWithInactiveMembershipForANonMember() throws Exception {
+    UUID matchId = storeMatch();
+    createCircle(matchId, USERNAME);
+
+    mockMvc
+        .perform(get("/api/v1/matches/{matchId}/circle", matchId).with(user(SECOND_USERNAME)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.matchId").value(matchId.toString()))
+        .andExpect(jsonPath("$.membershipActive").value(false))
+        .andExpect(jsonPath("$.createdByUserId").doesNotExist())
+        .andExpect(jsonPath("$.email").doesNotExist());
+
+    assertThat(rowCount("circle_memberships")).isOne();
+  }
+
+  @Test
+  @WithMockUser(username = USERNAME)
+  void reportsWhenAnExistingMatchHasNoCircle() throws Exception {
+    UUID matchId = storeMatch();
+
+    mockMvc
+        .perform(get("/api/v1/matches/{matchId}/circle", matchId))
+        .andExpect(status().isNotFound())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.type").value("urn:matchday:problem:circle-not-found"))
+        .andExpect(jsonPath("$.title").value("Circle not found"))
+        .andExpect(jsonPath("$.status").value(404))
+        .andExpect(jsonPath("$.detail").value("A circle was not found for match " + matchId))
+        .andExpect(jsonPath("$.trace").doesNotExist())
+        .andExpect(jsonPath("$.exception").doesNotExist());
+
+    assertNoCircleWasStored();
+  }
+
+  @Test
+  @WithMockUser(username = USERNAME)
+  void rejectsCircleLookupForAnUnknownMatch() throws Exception {
+    UUID unknownMatchId = UUID.fromString("10000000-0000-0000-0000-000000000099");
+
+    mockMvc
+        .perform(get("/api/v1/matches/{matchId}/circle", unknownMatchId))
+        .andExpect(status().isNotFound())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.type").value("urn:matchday:problem:match-not-found"))
+        .andExpect(jsonPath("$.title").value("Match not found"))
+        .andExpect(jsonPath("$.status").value(404))
+        .andExpect(jsonPath("$.detail").value("Match " + unknownMatchId + " was not found"));
+
+    assertNoCircleWasStored();
+  }
+
+  @Test
+  void rejectsAnonymousCircleLookup() throws Exception {
+    UUID matchId = storeMatch();
+
+    mockMvc
+        .perform(get("/api/v1/matches/{matchId}/circle", matchId))
+        .andExpect(status().isUnauthorized());
+
+    assertNoCircleWasStored();
+  }
+
+  @Test
+  @WithMockUser(username = USERNAME)
+  void rejectsCircleLookupWithAMalformedMatchId() throws Exception {
+    storeMatch();
+
+    mockMvc
+        .perform(get("/api/v1/matches/{matchId}/circle", "not-a-uuid"))
+        .andExpect(status().isBadRequest());
+
+    assertNoCircleWasStored();
   }
 
   private CreationAttempt createCircleWhenReleased(
@@ -286,6 +380,13 @@ class CircleControllerIntegrationTest {
             .getResponse()
             .getStatus();
     return new CreationAttempt(userId, responseStatus);
+  }
+
+  private void createCircle(UUID matchId, String username) throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/matches/{matchId}/circle", matchId).with(user(username)).with(csrf()))
+        .andExpect(status().isCreated());
   }
 
   private UUID storeMatch() {

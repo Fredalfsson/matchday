@@ -2,6 +2,7 @@ package se.matchday.backend.circle.infrastructure.persistence.jpa;
 
 import java.time.Instant;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -46,6 +47,22 @@ class JpaCircleRepositoryAdapter implements CircleRepository {
     membershipRepository.saveAndFlush(
         new CircleMembershipJpaEntity(circle.id(), creatorUserId, createdAt));
     return circle.toDomain();
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public Optional<Circle> findByMatchId(UUID matchId) {
+    return circleRepository
+        .findByMatchId(Objects.requireNonNull(matchId, "matchId must not be null"))
+        .map(entity -> entity.toDomain());
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public boolean hasActiveMembership(UUID circleId, UUID userId) {
+    return membershipRepository.existsByCircleIdAndUserId(
+        Objects.requireNonNull(circleId, "circleId must not be null"),
+        Objects.requireNonNull(userId, "userId must not be null"));
   }
 
   private static boolean causedByConstraint(Throwable failure, String constraintName) {

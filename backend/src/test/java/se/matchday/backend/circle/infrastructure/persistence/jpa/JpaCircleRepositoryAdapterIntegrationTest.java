@@ -76,6 +76,23 @@ class JpaCircleRepositoryAdapterIntegrationTest {
   }
 
   @Test
+  void findsCircleByMatchAndReportsMembershipStatus() {
+    UUID matchId = storeMatch();
+    Circle created = circleRepository.createWithCreatorMembership(matchId, USER_ID, CREATED_AT);
+
+    assertThat(circleRepository.findByMatchId(matchId)).contains(created);
+    assertThat(circleRepository.hasActiveMembership(created.id(), USER_ID)).isTrue();
+    assertThat(circleRepository.hasActiveMembership(created.id(), UUID.randomUUID())).isFalse();
+  }
+
+  @Test
+  void returnsEmptyWhenAnExistingMatchHasNoCircle() {
+    UUID matchId = storeMatch();
+
+    assertThat(circleRepository.findByMatchId(matchId)).isEmpty();
+  }
+
+  @Test
   void mapsTheOneCirclePerMatchConstraintToADomainConflict() {
     UUID matchId = storeMatch();
     circleRepository.createWithCreatorMembership(matchId, USER_ID, CREATED_AT);
