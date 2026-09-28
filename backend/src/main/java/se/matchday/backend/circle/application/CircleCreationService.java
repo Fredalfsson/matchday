@@ -25,13 +25,14 @@ public final class CircleCreationService {
     this.clock = clock;
   }
 
-  public Circle createForMatch(UUID matchId) {
+  public CircleCreationResult createForMatch(UUID matchId) {
     Objects.requireNonNull(matchId, "matchId must not be null");
     UUID userId = currentUser.userId().orElseThrow(CurrentUserUnavailableException::new);
     if (!matchRepository.existsById(matchId)) {
       throw new MatchNotFoundException(matchId);
     }
 
-    return circleRepository.createWithCreatorMembership(matchId, userId, clock.instant());
+    Circle circle = circleRepository.createWithCreatorMembership(matchId, userId, clock.instant());
+    return new CircleCreationResult(circle.id(), circle.matchId(), circle.createdAt());
   }
 }

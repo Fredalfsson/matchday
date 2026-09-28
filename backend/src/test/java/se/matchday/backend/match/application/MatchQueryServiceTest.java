@@ -44,7 +44,7 @@ class MatchQueryServiceTest {
                 previousSeason,
                 sameKickoffLowerId));
 
-    List<Match> matches = new MatchQueryService(repository).listMatches();
+    List<MatchSummary> matches = new MatchQueryService(repository).listMatches();
 
     assertThat(matches)
         .extracting(match -> match.id())

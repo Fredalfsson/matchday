@@ -19,7 +19,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import se.matchday.backend.TestcontainersConfiguration;
 import se.matchday.backend.match.application.MatchRepository;
 import se.matchday.backend.match.application.ProviderMatch;
-import se.matchday.backend.match.domain.Match;
 import se.matchday.backend.match.domain.MatchStatus;
 
 @Import(TestcontainersConfiguration.class)
@@ -71,13 +70,13 @@ class MatchControllerIntegrationTest {
             MatchStatus.FINISHED,
             "Stora Valla");
     repository.saveAll(List.of(providerMatch));
-    Match match = repository.findAll().getFirst();
+    String matchId = repository.findAll().getFirst().id().toString();
 
     mockMvc
         .perform(get("/api/v1/matches"))
         .andExpect(status().isOk())
         .andExpect(content().contentTypeCompatibleWith("application/json"))
-        .andExpect(jsonPath("$[0].id").value(match.id().toString()))
+        .andExpect(jsonPath("$[0].id").value(matchId))
         .andExpect(jsonPath("$[0].season").value(2026))
         .andExpect(jsonPath("$[0].round").value(1))
         .andExpect(jsonPath("$[0].homeTeamName").value("Degerfors"))

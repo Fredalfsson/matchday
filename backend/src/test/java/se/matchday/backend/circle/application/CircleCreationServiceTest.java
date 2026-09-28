@@ -36,9 +36,9 @@ class CircleCreationServiceTest {
         .thenReturn(createdCircle);
     CircleCreationService service = service(currentUser);
 
-    Circle result = service.createForMatch(MATCH_ID);
+    CircleCreationResult result = service.createForMatch(MATCH_ID);
 
-    assertThat(result).isEqualTo(createdCircle);
+    assertThat(result).isEqualTo(new CircleCreationResult(CIRCLE_ID, MATCH_ID, NOW));
     verify(matchRepository).existsById(MATCH_ID);
     verify(circleRepository).createWithCreatorMembership(MATCH_ID, USER_ID, NOW);
   }

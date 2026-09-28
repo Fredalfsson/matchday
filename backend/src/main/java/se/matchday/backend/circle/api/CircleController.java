@@ -7,8 +7,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import se.matchday.backend.circle.application.CircleCreationResult;
 import se.matchday.backend.circle.application.CircleCreationService;
-import se.matchday.backend.circle.domain.Circle;
 
 @RestController
 @RequestMapping("/api/v1/matches/{matchId}/circle")
@@ -22,8 +22,8 @@ class CircleController {
 
   @PostMapping
   ResponseEntity<CircleResponse> createCircle(@PathVariable UUID matchId) {
-    Circle circle = circleCreationService.createForMatch(matchId);
+    CircleCreationResult result = circleCreationService.createForMatch(matchId);
     URI location = URI.create("/api/v1/matches/" + matchId + "/circle");
-    return ResponseEntity.created(location).body(CircleResponse.fromCreatedCircle(circle));
+    return ResponseEntity.created(location).body(CircleResponse.from(result));
   }
 }
