@@ -157,6 +157,47 @@ class JpaCircleRepositoryAdapterIntegrationTest {
   }
 
   @Test
+  void removesAnExistingMembershipWithoutAffectingOtherMembers() {
+    UUID matchId = storeMatch();
+    Circle circle = circleRepository.createWithCreatorMembership(matchId, USER_ID, CREATED_AT);
+    circleRepository.addMembershipIfAbsent(circle.id(), SECOND_USER_ID, CREATED_AT.plusSeconds(1));
+
+    circleRepository.removeMembershipIfPresent(circle.id(), SECOND_USER_ID);
+
+    assertThat(circleRepository.hasActiveMembership(circle.id(), SECOND_USER_ID)).isFalse();
+    assertThat(membershipCount(circle.id(), SECOND_USER_ID)).isZero();
+    assertThat(circleRepository.hasActiveMembership(circle.id(), USER_ID)).isTrue();
+    assertThat(membershipCount(circle.id(), USER_ID)).isOne();
+  }
+
+  @Test
+  void ignoresAnAbsentMembership() {
+    UUID matchId = storeMatch();
+    Circle circle = circleRepository.createWithCreatorMembership(matchId, USER_ID, CREATED_AT);
+
+    circleRepository.removeMembershipIfPresent(circle.id(), SECOND_USER_ID);
+
+    assertThat(circleRepository.hasActiveMembership(circle.id(), USER_ID)).isTrue();
+    assertThat(membershipCount(circle.id(), USER_ID)).isOne();
+  }
+
+  @Test
+  void allowsAFormerMemberToJoinAgainWithANewTimestamp() {
+    UUID matchId = storeMatch();
+    Circle circle = circleRepository.createWithCreatorMembership(matchId, USER_ID, CREATED_AT);
+    Instant firstJoinedAt = CREATED_AT.plusSeconds(1);
+    Instant secondJoinedAt = CREATED_AT.plusSeconds(2);
+    circleRepository.addMembershipIfAbsent(circle.id(), SECOND_USER_ID, firstJoinedAt);
+
+    circleRepository.removeMembershipIfPresent(circle.id(), SECOND_USER_ID);
+    circleRepository.addMembershipIfAbsent(circle.id(), SECOND_USER_ID, secondJoinedAt);
+
+    assertThat(membershipCount(circle.id(), SECOND_USER_ID)).isOne();
+    assertThat(membershipCount(circle.id(), SECOND_USER_ID, firstJoinedAt)).isZero();
+    assertThat(membershipCount(circle.id(), SECOND_USER_ID, secondJoinedAt)).isOne();
+  }
+
+  @Test
   void mapsTheOneCirclePerMatchConstraintToADomainConflict() {
     UUID matchId = storeMatch();
     circleRepository.createWithCreatorMembership(matchId, USER_ID, CREATED_AT);

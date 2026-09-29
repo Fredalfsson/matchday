@@ -14,4 +14,6 @@ public interface CircleRepository {
   boolean hasActiveMembership(UUID circleId, UUID userId);
 
   void addMembershipIfAbsent(UUID circleId, UUID userId, Instant joinedAt);
+
+  void removeMembershipIfPresent(UUID circleId, UUID userId);
 }

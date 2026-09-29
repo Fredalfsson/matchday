@@ -74,6 +74,14 @@ class JpaCircleRepositoryAdapter implements CircleRepository {
         Objects.requireNonNull(joinedAt, "joinedAt must not be null"));
   }
 
+  @Override
+  @Transactional
+  public void removeMembershipIfPresent(UUID circleId, UUID userId) {
+    membershipRepository.deleteIfPresent(
+        Objects.requireNonNull(circleId, "circleId must not be null"),
+        Objects.requireNonNull(userId, "userId must not be null"));
+  }
+
   private static boolean causedByConstraint(Throwable failure, String constraintName) {
     Throwable cause = failure;
     while (cause != null) {

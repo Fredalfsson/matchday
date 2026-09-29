@@ -23,4 +23,12 @@ interface SpringDataCircleMembershipJpaRepository
       @Param("circleId") UUID circleId,
       @Param("userId") UUID userId,
       @Param("joinedAt") Instant joinedAt);
+
+  @Modifying
+  @NativeQuery(
+      """
+      DELETE FROM circle_memberships
+      WHERE circle_id = :circleId AND user_id = :userId
+      """)
+  int deleteIfPresent(@Param("circleId") UUID circleId, @Param("userId") UUID userId);
 }
