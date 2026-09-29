@@ -47,7 +47,7 @@ class CircleController {
 
   @PutMapping("/membership")
   ResponseEntity<Void> joinCircle(@PathVariable UUID matchId) {
-    circleMembershipService.joinForMatch(matchId);
+    circleMembershipService.joinCircleForMatch(matchId);
     return ResponseEntity.noContent().build();
   }
 }

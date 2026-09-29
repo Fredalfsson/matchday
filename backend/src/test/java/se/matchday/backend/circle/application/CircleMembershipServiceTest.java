@@ -2,6 +2,7 @@ package se.matchday.backend.circle.application;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -36,7 +37,7 @@ class CircleMembershipServiceTest {
     when(circleRepository.findByMatchId(MATCH_ID)).thenReturn(Optional.of(circle));
     CircleMembershipService service = service(currentUser);
 
-    service.joinForMatch(MATCH_ID);
+    service.joinCircleForMatch(MATCH_ID);
 
     verify(matchRepository).existsById(MATCH_ID);
     verify(circleRepository).findByMatchId(MATCH_ID);
@@ -47,7 +48,7 @@ class CircleMembershipServiceTest {
   void rejectsJoinWhenNoCurrentUserIdentityIsAvailable() {
     CircleMembershipService service = service(Optional::empty);
 
-    assertThatThrownBy(() -> service.joinForMatch(MATCH_ID))
+    assertThatThrownBy(() -> service.joinCircleForMatch(MATCH_ID))
         .isInstanceOf(CurrentUserUnavailableException.class)
         .hasMessage("An authenticated user identity is required");
     verifyNoInteractions(matchRepository, circleRepository);
@@ -59,20 +60,84 @@ class CircleMembershipServiceTest {
     when(matchRepository.existsById(MATCH_ID)).thenReturn(false);
     CircleMembershipService service = service(currentUser);
 
-    assertThatThrownBy(() -> service.joinForMatch(MATCH_ID))
+    assertThatThrownBy(() -> service.joinCircleForMatch(MATCH_ID))
         .isInstanceOf(MatchNotFoundException.class)
         .hasMessage("Match " + MATCH_ID + " was not found");
     verifyNoInteractions(circleRepository);
   }
 
   @Test
-  void reportsWhenAnExistingMatchHasNoCircle() {
+  void rejectsJoinWhenAnExistingMatchHasNoCircle() {
     CurrentUser currentUser = () -> Optional.of(USER_ID);
     when(matchRepository.existsById(MATCH_ID)).thenReturn(true);
     when(circleRepository.findByMatchId(MATCH_ID)).thenReturn(Optional.empty());
     CircleMembershipService service = service(currentUser);
 
-    assertThatThrownBy(() -> service.joinForMatch(MATCH_ID))
+    assertThatThrownBy(() -> service.joinCircleForMatch(MATCH_ID))
+        .isInstanceOf(CircleNotFoundException.class)
+        .hasMessage("A circle was not found for match " + MATCH_ID);
+    verify(circleRepository).findByMatchId(MATCH_ID);
+  }
+
+  @Test
+  void treatsRepeatedLeavesAsSuccessful() {
+    CurrentUser currentUser = () -> Optional.of(USER_ID);
+    Circle circle = new Circle(CIRCLE_ID, MATCH_ID, CREATOR_USER_ID, NOW.minusSeconds(60));
+    when(matchRepository.existsById(MATCH_ID)).thenReturn(true);
+    when(circleRepository.findByMatchId(MATCH_ID)).thenReturn(Optional.of(circle));
+    CircleMembershipService service = service(currentUser);
+
+    service.leaveCircleForMatch(MATCH_ID);
+    service.leaveCircleForMatch(MATCH_ID);
+
+    verify(matchRepository, times(2)).existsById(MATCH_ID);
+    verify(circleRepository, times(2)).findByMatchId(MATCH_ID);
+    verify(circleRepository, times(2)).removeMembershipIfPresent(CIRCLE_ID, USER_ID);
+  }
+
+  @Test
+  void allowsTheCircleCreatorToLeave() {
+    CurrentUser currentUser = () -> Optional.of(CREATOR_USER_ID);
+    Circle circle = new Circle(CIRCLE_ID, MATCH_ID, CREATOR_USER_ID, NOW.minusSeconds(60));
+    when(matchRepository.existsById(MATCH_ID)).thenReturn(true);
+    when(circleRepository.findByMatchId(MATCH_ID)).thenReturn(Optional.of(circle));
+    CircleMembershipService service = service(currentUser);
+
+    service.leaveCircleForMatch(MATCH_ID);
+
+    verify(circleRepository).removeMembershipIfPresent(CIRCLE_ID, CREATOR_USER_ID);
+  }
+
+  @Test
+  void rejectsLeaveWhenNoCurrentUserIdentityIsAvailable() {
+    CircleMembershipService service = service(Optional::empty);
+
+    assertThatThrownBy(() -> service.leaveCircleForMatch(MATCH_ID))
+        .isInstanceOf(CurrentUserUnavailableException.class)
+        .hasMessage("An authenticated user identity is required");
+    verifyNoInteractions(matchRepository, circleRepository);
+  }
+
+  @Test
+  void rejectsLeaveForAnUnknownMatch() {
+    CurrentUser currentUser = () -> Optional.of(USER_ID);
+    when(matchRepository.existsById(MATCH_ID)).thenReturn(false);
+    CircleMembershipService service = service(currentUser);
+
+    assertThatThrownBy(() -> service.leaveCircleForMatch(MATCH_ID))
+        .isInstanceOf(MatchNotFoundException.class)
+        .hasMessage("Match " + MATCH_ID + " was not found");
+    verifyNoInteractions(circleRepository);
+  }
+
+  @Test
+  void rejectsLeaveWhenAnExistingMatchHasNoCircle() {
+    CurrentUser currentUser = () -> Optional.of(USER_ID);
+    when(matchRepository.existsById(MATCH_ID)).thenReturn(true);
+    when(circleRepository.findByMatchId(MATCH_ID)).thenReturn(Optional.empty());
+    CircleMembershipService service = service(currentUser);
+
+    assertThatThrownBy(() -> service.leaveCircleForMatch(MATCH_ID))
         .isInstanceOf(CircleNotFoundException.class)
         .hasMessage("A circle was not found for match " + MATCH_ID);
     verify(circleRepository).findByMatchId(MATCH_ID);

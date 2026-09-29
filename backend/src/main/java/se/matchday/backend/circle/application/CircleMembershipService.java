@@ -25,17 +25,27 @@ public final class CircleMembershipService {
     this.clock = clock;
   }
 
-  public void joinForMatch(UUID matchId) {
+  public void joinCircleForMatch(UUID matchId) {
     Objects.requireNonNull(matchId, "matchId must not be null");
     UUID userId = currentUser.userId().orElseThrow(CurrentUserUnavailableException::new);
+    Circle circle = requireCircleForMatch(matchId);
+    circleRepository.addMembershipIfAbsent(circle.id(), userId, clock.instant());
+  }
+
+  public void leaveCircleForMatch(UUID matchId) {
+    Objects.requireNonNull(matchId, "matchId must not be null");
+    UUID userId = currentUser.userId().orElseThrow(CurrentUserUnavailableException::new);
+    Circle circle = requireCircleForMatch(matchId);
+    circleRepository.removeMembershipIfPresent(circle.id(), userId);
+  }
+
+  private Circle requireCircleForMatch(UUID matchId) {
     if (!matchRepository.existsById(matchId)) {
       throw new MatchNotFoundException(matchId);
     }
 
-    Circle circle =
-        circleRepository
-            .findByMatchId(matchId)
-            .orElseThrow(() -> new CircleNotFoundException(matchId));
-    circleRepository.addMembershipIfAbsent(circle.id(), userId, clock.instant());
+    return circleRepository
+        .findByMatchId(matchId)
+        .orElseThrow(() -> new CircleNotFoundException(matchId));
   }
 }
