@@ -3,8 +3,8 @@ info:
   title: Matchday API
   version: 0.1.0
   description: >-
-    API for importing and reading Allsvenskan matches and creating, reading, and joining match
-    circles.
+    API for importing and reading Allsvenskan matches and creating, reading, joining, and leaving
+    match circles.
 servers:
   - url: http://127.0.0.1:8080
     description: Local development
@@ -202,6 +202,71 @@ paths:
       responses:
         "204":
           description: Membership is active
+        "400":
+          description: The matchId path parameter is not a valid UUID
+        "401":
+          description: >-
+            Authentication is required. The security layer may return this status without a body;
+            an authenticated request whose application identity cannot be resolved returns a
+            problem detail.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              example:
+                type: urn:matchday:problem:authentication-required
+                title: Authentication required
+                status: 401
+                detail: An authenticated user identity is required
+                instance: >-
+                  /api/v1/matches/10000000-0000-0000-0000-000000000001/circle/membership
+        "403":
+          description: >-
+            The request is rejected by the active security policy, for example when CSRF protection
+            is enabled and the request does not contain a valid CSRF token.
+        "404":
+          description: The match or its circle does not exist
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                matchNotFound:
+                  summary: Match not found
+                  value:
+                    type: urn:matchday:problem:match-not-found
+                    title: Match not found
+                    status: 404
+                    detail: Match 10000000-0000-0000-0000-000000000099 was not found
+                    instance: >-
+                      /api/v1/matches/10000000-0000-0000-0000-000000000099/circle/membership
+                circleNotFound:
+                  summary: Circle not found
+                  value:
+                    type: urn:matchday:problem:circle-not-found
+                    title: Circle not found
+                    status: 404
+                    detail: >-
+                      A circle was not found for match
+                      10000000-0000-0000-0000-000000000001
+                    instance: >-
+                      /api/v1/matches/10000000-0000-0000-0000-000000000001/circle/membership
+    delete:
+      tags:
+        - Circles
+      summary: Leave a match circle
+      description: >-
+        Deactivates the authenticated user's membership in the match circle without deleting the
+        circle. The operation is idempotent and returns the same successful response when the
+        membership is already inactive. The declared Basic Auth scheme applies to the documented
+        local server; the production authentication mechanism will be supplied by the
+        authentication integration and is intentionally not fixed by this contract yet.
+      operationId: leaveMatchCircle
+      security:
+        - localBasicAuth: []
+      responses:
+        "204":
+          description: Membership is inactive
         "400":
           description: The matchId path parameter is not a valid UUID
         "401":
