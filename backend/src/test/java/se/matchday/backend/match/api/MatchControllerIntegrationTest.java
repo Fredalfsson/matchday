@@ -19,7 +19,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import se.matchday.backend.TestcontainersConfiguration;
 import se.matchday.backend.match.application.MatchRepository;
 import se.matchday.backend.match.application.ProviderMatch;
-import se.matchday.backend.match.domain.Match;
 import se.matchday.backend.match.domain.MatchStatus;
 
 @Import(TestcontainersConfiguration.class)
@@ -28,20 +27,20 @@ import se.matchday.backend.match.domain.MatchStatus;
 class MatchControllerIntegrationTest {
 
   private final MockMvc mockMvc;
-  private final MatchRepository repository;
+  private final MatchRepository matchRepository;
   private final JdbcTemplate jdbcTemplate;
 
   @Autowired
   MatchControllerIntegrationTest(
-      MockMvc mockMvc, MatchRepository repository, JdbcTemplate jdbcTemplate) {
+      MockMvc mockMvc, MatchRepository matchRepository, JdbcTemplate jdbcTemplate) {
     this.mockMvc = mockMvc;
-    this.repository = repository;
+    this.matchRepository = matchRepository;
     this.jdbcTemplate = jdbcTemplate;
   }
 
   @BeforeEach
   void clearMatches() {
-    jdbcTemplate.update("TRUNCATE TABLE matches");
+    jdbcTemplate.update("TRUNCATE TABLE circle_memberships, circles, matches");
   }
 
   @Test
@@ -70,14 +69,14 @@ class MatchControllerIntegrationTest {
             3,
             MatchStatus.FINISHED,
             "Stora Valla");
-    repository.saveAll(List.of(providerMatch));
-    Match match = repository.findAll().getFirst();
+    matchRepository.saveAll(List.of(providerMatch));
+    String matchId = matchRepository.findAll().getFirst().id().toString();
 
     mockMvc
         .perform(get("/api/v1/matches"))
         .andExpect(status().isOk())
         .andExpect(content().contentTypeCompatibleWith("application/json"))
-        .andExpect(jsonPath("$[0].id").value(match.id().toString()))
+        .andExpect(jsonPath("$[0].id").value(matchId))
         .andExpect(jsonPath("$[0].season").value(2026))
         .andExpect(jsonPath("$[0].round").value(1))
         .andExpect(jsonPath("$[0].homeTeamName").value("Degerfors"))

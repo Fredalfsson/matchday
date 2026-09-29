@@ -4,8 +4,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
-import se.matchday.backend.match.domain.Match;
-import se.matchday.backend.match.domain.MatchStatus;
+import se.matchday.backend.match.application.MatchSummary;
 
 record MatchResponse(
     UUID id,
@@ -15,12 +14,12 @@ record MatchResponse(
     String awayTeamName,
     LocalDate scheduledDate,
     @Nullable Instant kickoffAt,
-    MatchStatus status,
+    String status,
     @Nullable Integer homeScore,
     @Nullable Integer awayScore,
     @Nullable String venueName) {
 
-  static MatchResponse from(Match match) {
+  static MatchResponse from(MatchSummary match) {
     return new MatchResponse(
         match.id(),
         match.season(),

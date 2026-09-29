@@ -4,8 +4,10 @@ Matchday är en social webbapplikation med matcher i Allsvenskan som utgångspun
 innehåller en Spring Boot-backend, en Next.js-frontend samt automatiserade kvalitets- och
 säkerhetskontroller.
 
-Backend stöder manuell import och uppdatering av matchdata från TheSportsDB samt ett publikt API
-för matcher som har sparats i PostgreSQL.
+Backend stöder manuell import och uppdatering av matchdata från TheSportsDB, ett publikt API för
+matcher som har sparats i PostgreSQL samt ett API där en autentiserad användare med en
+applikationsidentitet kan skapa, läsa, ansluta till och lämna en diskussionsgrupp (`circle`) för
+en match.
 
 ## Teknik
 
@@ -23,6 +25,9 @@ Backend använder en feature-baserad paketstruktur med separata lager för API, 
 domän och infrastruktur. PostgreSQL är primär datakälla. TheSportsDB-integrationen implementerar
 det interna gränssnittet `MatchDataProvider`, vilket håller leverantörens datamodell utanför
 domänmodellen och det publika API-kontraktet.
+
+Stödet för circles följer samma struktur. Gränssnittet `CurrentUser` skiljer applikationslogiken
+från den ännu ofärdiga autentiseringsintegrationen.
 
 ## Projektstruktur
 
@@ -43,6 +48,7 @@ matchday/
 - JDK 25
 - Docker med Docker Compose
 - Git
+- Node.js 24 för att köra OpenAPI-kontrollen lokalt
 
 Maven behöver inte installeras separat eftersom projektet innehåller Maven Wrapper.
 
@@ -78,13 +84,39 @@ Svaret är `[]` om databasen ännu inte innehåller några matcher. Fortsätt d�
 | Metod och sökväg | Åtkomst | Beskrivning |
 | --- | --- | --- |
 | `GET /api/v1/matches` | Publik | Returnerar sparade matcher |
+| `GET /api/v1/matches/{matchId}/circle` | Autentiserad med applikationsidentitet | Returnerar matchens circle och användarens medlemsstatus |
+| `POST /api/v1/matches/{matchId}/circle` | Autentiserad med applikationsidentitet | Skapar matchens circle och aktiverar skaparens medlemskap |
+| `PUT /api/v1/matches/{matchId}/circle/membership` | Autentiserad med applikationsidentitet | Aktiverar användarens medlemskap idempotent |
+| `DELETE /api/v1/matches/{matchId}/circle/membership` | Autentiserad med applikationsidentitet | Avslutar användarens medlemskap idempotent |
 | `POST /api/v1/admin/match-imports` | Rollen `MATCH_IMPORTER` | Importerar eller uppdaterar angiven säsong |
 
 Matchlistan sorteras efter säsong, omgång, datum, avsparkstid och internt match-id. Frontend
 ansvarar för filtrering och uppdelning mellan kommande och spelade matcher.
 
-API-kontraktet finns i [`docs/openapi.yaml`](docs/openapi.yaml). Specifikationen följer OpenAPI
-3.1.0 och kan importeras till SwaggerHub.
+API-kontraktet finns i [`docs/openapi.yaml`](docs/openapi.yaml) och följer OpenAPI 3.1.0.
+
+### Circle-stöd i nuvarande backend
+
+- En match kan ha noll eller en circle.
+- Circle skapas först när en autentiserad användare med en tillgänglig applikationsidentitet
+  startar diskussionen.
+- Skaparen blir medlem i samma transaktion som circle skapas.
+- Circle kan läsas av en autentiserad användare. Svaret visar om den aktuella användaren har ett
+  aktivt medlemskap utan att skapa eller ändra medlemskap.
+- En autentiserad användare kan ansluta till en befintlig circle. Upprepade anrop är idempotenta
+  och svarar med `204 No Content` utan att skapa dubbla medlemskap.
+- En autentiserad användare, inklusive skaparen, kan lämna en circle. Upprepade anrop är
+  idempotenta och svarar med `204 No Content`. Circle och övriga medlemskap ligger kvar.
+- API-svaren exponerar circle-ID, match-ID, skapandetid och medlemsstatus, men inte internt
+  användar-ID eller e-postadress.
+- Samtidiga skapandeförsök skyddas av databasens unika villkor. Ett anrop får `201 Created` och
+  övriga får `409 Conflict`.
+
+Stöd för att skicka meddelanden är ännu inte implementerat.
+Den lokala Basic Auth-profilen autentiserar administrativa importanrop men kopplar
+inte inloggningen till ett användar-ID i domänen. Circle-anrop kräver därför auth-modulens framtida
+`CurrentUser`-adapter. Backendens automatiserade tester använder en avgränsad testadapter så att
+arbetet med circles inte blockeras av auth-utvecklingen.
 
 ## Manuell matchimport lokalt
 
@@ -109,10 +141,10 @@ curl --fail-with-body \
   http://127.0.0.1:8080/api/v1/admin/match-imports
 ```
 
-Importen hämtar 30 omgångar sekventiellt och tar normalt omkring 65–90 sekunder. `curl` visar
-inget medan anropet pågår utan skriver svaret först när importen är klar. Om TheSportsDB svarar
-med `429 Too Many Requests` väntar backend enligt `Retry-After` innan den försöker igen, vilket
-kan förlänga körtiden. Återförsök och eventuella fel visas i terminalen där backend körs.
+Importen hämtar 30 omgångar sekventiellt och kan ta över en minut. `curl` visar inget medan
+anropet pågår utan skriver svaret först när importen är klar. Om TheSportsDB svarar med `429 Too
+Many Requests` väntar backend enligt `Retry-After` innan den försöker igen, vilket kan förlänga
+körtiden. Återförsök och eventuella fel visas i terminalen där backend körs.
 
 Alla 240 matcher finns inte nödvändigtvis hos providern när säsongens spelschema börjar
 fastställas. Importen sparar därför de matcher som finns och kan köras igen för att fylla på nya
@@ -135,6 +167,14 @@ cd backend
 Kommandot kör tester, kontrollerar kodformat, genererar en JaCoCo-rapport, verifierar minst 70
 procent linjetäckning och bygger applikationen. GitHub Actions kör samma backendverifiering och
 separata kontroller för OpenAPI-kontraktet och Maven-beroenden.
+
+Kör samma OpenAPI-kontroll som CI från projektets rotkatalog med:
+
+```bash
+REDOCLY_TELEMETRY=off \
+REDOCLY_SUPPRESS_UPDATE_NOTICE=true \
+npx --yes @redocly/cli@2.45.0 lint docs/openapi.yaml
+```
 
 ## Dokumentation
 
