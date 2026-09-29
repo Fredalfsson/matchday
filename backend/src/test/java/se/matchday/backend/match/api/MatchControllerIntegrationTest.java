@@ -27,14 +27,14 @@ import se.matchday.backend.match.domain.MatchStatus;
 class MatchControllerIntegrationTest {
 
   private final MockMvc mockMvc;
-  private final MatchRepository repository;
+  private final MatchRepository matchRepository;
   private final JdbcTemplate jdbcTemplate;
 
   @Autowired
   MatchControllerIntegrationTest(
-      MockMvc mockMvc, MatchRepository repository, JdbcTemplate jdbcTemplate) {
+      MockMvc mockMvc, MatchRepository matchRepository, JdbcTemplate jdbcTemplate) {
     this.mockMvc = mockMvc;
-    this.repository = repository;
+    this.matchRepository = matchRepository;
     this.jdbcTemplate = jdbcTemplate;
   }
 
@@ -69,8 +69,8 @@ class MatchControllerIntegrationTest {
             3,
             MatchStatus.FINISHED,
             "Stora Valla");
-    repository.saveAll(List.of(providerMatch));
-    String matchId = repository.findAll().getFirst().id().toString();
+    matchRepository.saveAll(List.of(providerMatch));
+    String matchId = matchRepository.findAll().getFirst().id().toString();
 
     mockMvc
         .perform(get("/api/v1/matches"))

@@ -17,10 +17,10 @@ import se.matchday.backend.match.domain.Match;
 @Repository
 class JpaMatchRepositoryAdapter implements MatchRepository {
 
-  private final SpringDataMatchJpaRepository repository;
+  private final SpringDataMatchJpaRepository matchRepository;
 
-  JpaMatchRepositoryAdapter(SpringDataMatchJpaRepository repository) {
-    this.repository = repository;
+  JpaMatchRepositoryAdapter(SpringDataMatchJpaRepository matchRepository) {
+    this.matchRepository = matchRepository;
   }
 
   @Override
@@ -38,7 +38,7 @@ class JpaMatchRepositoryAdapter implements MatchRepository {
     }
 
     Map<String, MatchJpaEntity> entitiesByExternalMatchId = new HashMap<>();
-    for (MatchJpaEntity entity : repository.findAllByExternalMatchIdIn(externalMatchIds)) {
+    for (MatchJpaEntity entity : matchRepository.findAllByExternalMatchIdIn(externalMatchIds)) {
       entitiesByExternalMatchId.put(entity.externalMatchId(), entity);
     }
 
@@ -53,18 +53,18 @@ class JpaMatchRepositoryAdapter implements MatchRepository {
         entity.updateFrom(match);
       }
     }
-    repository.saveAll(newEntities);
+    matchRepository.saveAll(newEntities);
   }
 
   @Override
   @Transactional(readOnly = true)
   public List<Match> findAll() {
-    return repository.findAll().stream().map(entity -> entity.toDomain()).toList();
+    return matchRepository.findAll().stream().map(entity -> entity.toDomain()).toList();
   }
 
   @Override
   @Transactional(readOnly = true)
   public boolean existsById(UUID matchId) {
-    return repository.existsById(Objects.requireNonNull(matchId, "matchId must not be null"));
+    return matchRepository.existsById(Objects.requireNonNull(matchId, "matchId must not be null"));
   }
 }
