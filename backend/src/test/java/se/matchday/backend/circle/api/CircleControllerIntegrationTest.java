@@ -87,7 +87,7 @@ class CircleControllerIntegrationTest {
   }
 
   @Test
-  void rejectsAnAnonymousUser() throws Exception {
+  void rejectsAnonymousCircleCreation() throws Exception {
     UUID matchId = storeMatch();
 
     mockMvc
@@ -158,7 +158,7 @@ class CircleControllerIntegrationTest {
 
   @Test
   @WithMockUser(username = USERNAME)
-  void rejectsAnUnknownMatch() throws Exception {
+  void rejectsCircleCreationForAnUnknownMatch() throws Exception {
     UUID unknownMatchId = UUID.fromString("10000000-0000-0000-0000-000000000099");
 
     mockMvc
@@ -212,7 +212,7 @@ class CircleControllerIntegrationTest {
 
   @Test
   @WithMockUser(username = USERNAME)
-  void rejectsAMalformedMatchId() throws Exception {
+  void rejectsCircleCreationWithAMalformedMatchId() throws Exception {
     storeMatch();
 
     mockMvc
@@ -389,7 +389,7 @@ class CircleControllerIntegrationTest {
   }
 
   @Test
-  void reportsWhenMembershipJoinTargetsAMatchWithoutACircle() throws Exception {
+  void rejectsMembershipJoinWhenMatchHasNoCircle() throws Exception {
     UUID matchId = storeMatch();
 
     mockMvc
@@ -459,7 +459,7 @@ class CircleControllerIntegrationTest {
 
   @Test
   @WithMockUser(username = USERNAME)
-  void reportsWhenAnExistingMatchHasNoCircle() throws Exception {
+  void rejectsCircleLookupWhenMatchHasNoCircle() throws Exception {
     UUID matchId = storeMatch();
 
     mockMvc

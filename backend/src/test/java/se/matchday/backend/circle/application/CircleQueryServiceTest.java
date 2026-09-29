@@ -71,7 +71,7 @@ class CircleQueryServiceTest {
   }
 
   @Test
-  void reportsWhenAnExistingMatchHasNoCircle() {
+  void rejectsLookupWhenAnExistingMatchHasNoCircle() {
     when(matchRepository.existsById(MATCH_ID)).thenReturn(true);
     when(circleRepository.findByMatchId(MATCH_ID)).thenReturn(Optional.empty());
 
