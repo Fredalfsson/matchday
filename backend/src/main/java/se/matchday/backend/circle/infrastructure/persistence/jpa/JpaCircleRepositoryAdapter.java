@@ -65,6 +65,15 @@ class JpaCircleRepositoryAdapter implements CircleRepository {
         Objects.requireNonNull(userId, "userId must not be null"));
   }
 
+  @Override
+  @Transactional
+  public void addMembershipIfAbsent(UUID circleId, UUID userId, Instant joinedAt) {
+    membershipRepository.insertIfAbsent(
+        Objects.requireNonNull(circleId, "circleId must not be null"),
+        Objects.requireNonNull(userId, "userId must not be null"),
+        Objects.requireNonNull(joinedAt, "joinedAt must not be null"));
+  }
+
   private static boolean causedByConstraint(Throwable failure, String constraintName) {
     Throwable cause = failure;
     while (cause != null) {

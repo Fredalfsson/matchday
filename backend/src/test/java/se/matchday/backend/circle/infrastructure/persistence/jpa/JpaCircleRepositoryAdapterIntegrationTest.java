@@ -5,8 +5,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,6 +34,8 @@ import se.matchday.backend.match.domain.MatchStatus;
 class JpaCircleRepositoryAdapterIntegrationTest {
 
   private static final UUID USER_ID = UUID.fromString("20000000-0000-0000-0000-000000000001");
+  private static final UUID SECOND_USER_ID =
+      UUID.fromString("20000000-0000-0000-0000-000000000002");
   private static final Instant CREATED_AT = Instant.parse("2026-09-27T10:15:30Z");
 
   private final CircleRepository circleRepository;
@@ -90,6 +98,62 @@ class JpaCircleRepositoryAdapterIntegrationTest {
     UUID matchId = storeMatch();
 
     assertThat(circleRepository.findByMatchId(matchId)).isEmpty();
+  }
+
+  @Test
+  void addsMembershipForANonMember() {
+    UUID matchId = storeMatch();
+    Circle circle = circleRepository.createWithCreatorMembership(matchId, USER_ID, CREATED_AT);
+    Instant joinedAt = CREATED_AT.plusSeconds(1);
+
+    circleRepository.addMembershipIfAbsent(circle.id(), SECOND_USER_ID, joinedAt);
+
+    assertThat(circleRepository.hasActiveMembership(circle.id(), SECOND_USER_ID)).isTrue();
+    assertThat(membershipCount(circle.id(), SECOND_USER_ID)).isOne();
+    assertThat(membershipCount(circle.id(), SECOND_USER_ID, joinedAt)).isOne();
+  }
+
+  @Test
+  void keepsAnExistingMembershipUnchanged() {
+    UUID matchId = storeMatch();
+    Circle circle = circleRepository.createWithCreatorMembership(matchId, USER_ID, CREATED_AT);
+    Instant joinedAt = CREATED_AT.plusSeconds(1);
+
+    circleRepository.addMembershipIfAbsent(circle.id(), SECOND_USER_ID, joinedAt);
+    circleRepository.addMembershipIfAbsent(circle.id(), SECOND_USER_ID, joinedAt.plusSeconds(1));
+
+    assertThat(membershipCount(circle.id(), SECOND_USER_ID)).isOne();
+    assertThat(membershipCount(circle.id(), SECOND_USER_ID, joinedAt)).isOne();
+  }
+
+  @Test
+  void allowsConcurrentIdempotentMembershipJoins() throws Exception {
+    UUID matchId = storeMatch();
+    Circle circle = circleRepository.createWithCreatorMembership(matchId, USER_ID, CREATED_AT);
+    Instant joinedAt = CREATED_AT.plusSeconds(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    CountDownLatch requestsReady = new CountDownLatch(2);
+    CountDownLatch startRequests = new CountDownLatch(1);
+
+    try {
+      Future<?> firstAttempt =
+          executor.submit(
+              () -> joinWhenReleased(circle.id(), joinedAt, requestsReady, startRequests));
+      Future<?> secondAttempt =
+          executor.submit(
+              () -> joinWhenReleased(circle.id(), joinedAt, requestsReady, startRequests));
+
+      assertThat(requestsReady.await(5, TimeUnit.SECONDS)).isTrue();
+      startRequests.countDown();
+      firstAttempt.get(10, TimeUnit.SECONDS);
+      secondAttempt.get(10, TimeUnit.SECONDS);
+
+      assertThat(membershipCount(circle.id(), SECOND_USER_ID)).isOne();
+    } finally {
+      startRequests.countDown();
+      executor.shutdownNow();
+      executor.awaitTermination(5, TimeUnit.SECONDS);
+    }
   }
 
   @Test
@@ -165,6 +229,41 @@ class JpaCircleRepositoryAdapterIntegrationTest {
     assertThat(
             jdbcTemplate.queryForObject("SELECT COUNT(*) FROM circle_memberships", Integer.class))
         .isZero();
+  }
+
+  private void joinWhenReleased(
+      UUID circleId, Instant joinedAt, CountDownLatch requestsReady, CountDownLatch startRequests) {
+    requestsReady.countDown();
+    try {
+      if (!startRequests.await(5, TimeUnit.SECONDS)) {
+        throw new IllegalStateException("Concurrent membership joins were not started in time");
+      }
+      circleRepository.addMembershipIfAbsent(circleId, SECOND_USER_ID, joinedAt);
+    } catch (InterruptedException exception) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("Concurrent membership join was interrupted", exception);
+    }
+  }
+
+  private int membershipCount(UUID circleId, UUID userId) {
+    return jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM circle_memberships WHERE circle_id = ? AND user_id = ?",
+        Integer.class,
+        circleId,
+        userId);
+  }
+
+  private int membershipCount(UUID circleId, UUID userId, Instant joinedAt) {
+    return jdbcTemplate.queryForObject(
+        """
+        SELECT COUNT(*)
+        FROM circle_memberships
+        WHERE circle_id = ? AND user_id = ? AND joined_at = ?
+        """,
+        Integer.class,
+        circleId,
+        userId,
+        joinedAt.atOffset(ZoneOffset.UTC));
   }
 
   private UUID storeMatch() {

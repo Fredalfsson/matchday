@@ -12,4 +12,6 @@ public interface CircleRepository {
   Optional<Circle> findByMatchId(UUID matchId);
 
   boolean hasActiveMembership(UUID circleId, UUID userId);
+
+  void addMembershipIfAbsent(UUID circleId, UUID userId, Instant joinedAt);
 }
