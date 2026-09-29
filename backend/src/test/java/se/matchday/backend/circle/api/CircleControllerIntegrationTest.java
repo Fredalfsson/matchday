@@ -5,6 +5,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -265,6 +266,161 @@ class CircleControllerIntegrationTest {
       executor.shutdownNow();
       executor.awaitTermination(5, TimeUnit.SECONDS);
     }
+  }
+
+  @Test
+  void joinsAnExistingCircleAndReportsActiveMembership() throws Exception {
+    UUID matchId = storeMatch();
+    createCircle(matchId, USERNAME);
+
+    mockMvc
+        .perform(
+            put("/api/v1/matches/{matchId}/circle/membership", matchId)
+                .with(user(SECOND_USERNAME))
+                .with(csrf()))
+        .andExpect(status().isNoContent())
+        .andExpect(content().string(""));
+
+    assertThat(rowCount("circle_memberships")).isEqualTo(2);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM circle_memberships WHERE user_id = ?",
+                Integer.class,
+                SECOND_USER_ID))
+        .isOne();
+
+    mockMvc
+        .perform(get("/api/v1/matches/{matchId}/circle", matchId).with(user(SECOND_USERNAME)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.membershipActive").value(true));
+  }
+
+  @Test
+  void treatsRepeatedMembershipJoinAsSuccessful() throws Exception {
+    UUID matchId = storeMatch();
+    createCircle(matchId, USERNAME);
+
+    mockMvc
+        .perform(
+            put("/api/v1/matches/{matchId}/circle/membership", matchId)
+                .with(user(SECOND_USERNAME))
+                .with(csrf()))
+        .andExpect(status().isNoContent());
+    mockMvc
+        .perform(
+            put("/api/v1/matches/{matchId}/circle/membership", matchId)
+                .with(user(SECOND_USERNAME))
+                .with(csrf()))
+        .andExpect(status().isNoContent());
+
+    assertThat(rowCount("circle_memberships")).isEqualTo(2);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM circle_memberships WHERE user_id = ?",
+                Integer.class,
+                SECOND_USER_ID))
+        .isOne();
+  }
+
+  @Test
+  void rejectsAnonymousMembershipJoin() throws Exception {
+    UUID matchId = storeMatch();
+    createCircle(matchId, USERNAME);
+
+    mockMvc
+        .perform(put("/api/v1/matches/{matchId}/circle/membership", matchId).with(csrf()))
+        .andExpect(status().isUnauthorized());
+
+    assertThat(rowCount("circle_memberships")).isOne();
+  }
+
+  @Test
+  @WithMockUser(username = UNMAPPED_USERNAME)
+  void rejectsMembershipJoinWhenTheAuthenticatedIdentityCannotBeResolved() throws Exception {
+    UUID matchId = storeMatch();
+    createCircle(matchId, USERNAME);
+
+    mockMvc
+        .perform(put("/api/v1/matches/{matchId}/circle/membership", matchId).with(csrf()))
+        .andExpect(status().isUnauthorized())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.type").value("urn:matchday:problem:authentication-required"))
+        .andExpect(jsonPath("$.title").value("Authentication required"))
+        .andExpect(jsonPath("$.status").value(401))
+        .andExpect(jsonPath("$.detail").value("An authenticated user identity is required"))
+        .andExpect(jsonPath("$.trace").doesNotExist())
+        .andExpect(jsonPath("$.exception").doesNotExist());
+
+    assertThat(rowCount("circle_memberships")).isOne();
+  }
+
+  @Test
+  void rejectsMembershipJoinWithoutCsrfProtection() throws Exception {
+    UUID matchId = storeMatch();
+    createCircle(matchId, USERNAME);
+
+    mockMvc
+        .perform(
+            put("/api/v1/matches/{matchId}/circle/membership", matchId).with(user(SECOND_USERNAME)))
+        .andExpect(status().isForbidden());
+
+    assertThat(rowCount("circle_memberships")).isOne();
+  }
+
+  @Test
+  void rejectsMembershipJoinForAnUnknownMatch() throws Exception {
+    UUID unknownMatchId = UUID.fromString("10000000-0000-0000-0000-000000000099");
+
+    mockMvc
+        .perform(
+            put("/api/v1/matches/{matchId}/circle/membership", unknownMatchId)
+                .with(user(SECOND_USERNAME))
+                .with(csrf()))
+        .andExpect(status().isNotFound())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.type").value("urn:matchday:problem:match-not-found"))
+        .andExpect(jsonPath("$.title").value("Match not found"))
+        .andExpect(jsonPath("$.status").value(404))
+        .andExpect(jsonPath("$.detail").value("Match " + unknownMatchId + " was not found"))
+        .andExpect(jsonPath("$.trace").doesNotExist())
+        .andExpect(jsonPath("$.exception").doesNotExist());
+
+    assertNoCircleWasStored();
+  }
+
+  @Test
+  void reportsWhenMembershipJoinTargetsAMatchWithoutACircle() throws Exception {
+    UUID matchId = storeMatch();
+
+    mockMvc
+        .perform(
+            put("/api/v1/matches/{matchId}/circle/membership", matchId)
+                .with(user(SECOND_USERNAME))
+                .with(csrf()))
+        .andExpect(status().isNotFound())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.type").value("urn:matchday:problem:circle-not-found"))
+        .andExpect(jsonPath("$.title").value("Circle not found"))
+        .andExpect(jsonPath("$.status").value(404))
+        .andExpect(jsonPath("$.detail").value("A circle was not found for match " + matchId))
+        .andExpect(jsonPath("$.trace").doesNotExist())
+        .andExpect(jsonPath("$.exception").doesNotExist());
+
+    assertNoCircleWasStored();
+  }
+
+  @Test
+  void rejectsMembershipJoinWithAMalformedMatchId() throws Exception {
+    storeMatch();
+
+    mockMvc
+        .perform(
+            put("/api/v1/matches/{matchId}/circle/membership", "not-a-uuid")
+                .with(user(SECOND_USERNAME))
+                .with(csrf()))
+        .andExpect(status().isBadRequest());
+
+    assertNoCircleWasStored();
   }
 
   @Test
