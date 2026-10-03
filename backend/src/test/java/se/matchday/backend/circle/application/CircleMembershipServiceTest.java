@@ -15,6 +15,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import se.matchday.backend.circle.domain.Circle;
 import se.matchday.backend.identity.application.CurrentUser;
+import se.matchday.backend.identity.application.CurrentUserUnavailableException;
 import se.matchday.backend.match.application.MatchRepository;
 
 class CircleMembershipServiceTest {
@@ -74,7 +75,7 @@ class CircleMembershipServiceTest {
     CircleMembershipService service = service(currentUser);
 
     assertThatThrownBy(() -> service.joinCircleForMatch(MATCH_ID))
-        .isInstanceOf(CircleNotFoundException.class)
+        .isInstanceOf(CircleNotFoundForMatchException.class)
         .hasMessage("A circle was not found for match " + MATCH_ID);
     verify(circleRepository).findByMatchId(MATCH_ID);
   }
@@ -138,7 +139,7 @@ class CircleMembershipServiceTest {
     CircleMembershipService service = service(currentUser);
 
     assertThatThrownBy(() -> service.leaveCircleForMatch(MATCH_ID))
-        .isInstanceOf(CircleNotFoundException.class)
+        .isInstanceOf(CircleNotFoundForMatchException.class)
         .hasMessage("A circle was not found for match " + MATCH_ID);
     verify(circleRepository).findByMatchId(MATCH_ID);
   }

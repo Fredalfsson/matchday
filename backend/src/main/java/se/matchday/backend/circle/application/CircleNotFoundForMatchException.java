@@ -2,9 +2,9 @@ package se.matchday.backend.circle.application;
 
 import java.util.UUID;
 
-public final class CircleNotFoundException extends RuntimeException {
+public final class CircleNotFoundForMatchException extends RuntimeException {
 
-  CircleNotFoundException(UUID matchId) {
+  CircleNotFoundForMatchException(UUID matchId) {
     super("A circle was not found for match " + matchId);
   }
 }

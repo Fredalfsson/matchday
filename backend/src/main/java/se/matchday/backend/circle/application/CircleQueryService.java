@@ -4,6 +4,7 @@ import java.util.Objects;
 import java.util.UUID;
 import se.matchday.backend.circle.domain.Circle;
 import se.matchday.backend.identity.application.CurrentUser;
+import se.matchday.backend.identity.application.CurrentUserUnavailableException;
 import se.matchday.backend.match.application.MatchRepository;
 
 public final class CircleQueryService {
@@ -29,7 +30,7 @@ public final class CircleQueryService {
     Circle circle =
         circleRepository
             .findByMatchId(matchId)
-            .orElseThrow(() -> new CircleNotFoundException(matchId));
+            .orElseThrow(() -> new CircleNotFoundForMatchException(matchId));
     boolean membershipActive = circleRepository.hasActiveMembership(circle.id(), userId);
     return new CircleMembershipStatus(
         circle.id(), circle.matchId(), circle.createdAt(), membershipActive);

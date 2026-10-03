@@ -1,8 +1,8 @@
-package se.matchday.backend.circle.application;
+package se.matchday.backend.identity.application;
 
 public final class CurrentUserUnavailableException extends RuntimeException {
 
-  CurrentUserUnavailableException() {
+  public CurrentUserUnavailableException() {
     super("An authenticated user identity is required");
   }
 }
