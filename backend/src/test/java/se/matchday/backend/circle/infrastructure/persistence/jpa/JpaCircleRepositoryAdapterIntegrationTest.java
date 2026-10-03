@@ -88,6 +88,8 @@ class JpaCircleRepositoryAdapterIntegrationTest {
     UUID matchId = storeMatch();
     Circle created = circleRepository.createWithCreatorMembership(matchId, USER_ID, CREATED_AT);
 
+    assertThat(circleRepository.existsById(created.id())).isTrue();
+    assertThat(circleRepository.existsById(UUID.randomUUID())).isFalse();
     assertThat(circleRepository.findByMatchId(matchId)).contains(created);
     assertThat(circleRepository.hasActiveMembership(created.id(), USER_ID)).isTrue();
     assertThat(circleRepository.hasActiveMembership(created.id(), UUID.randomUUID())).isFalse();

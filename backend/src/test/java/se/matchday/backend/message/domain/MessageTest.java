@@ -26,6 +26,13 @@ class MessageTest {
   }
 
   @Test
+  void normalizesOnlySurroundingWhitespace() {
+    String normalizedContent = Message.normalizeContent("  First line\nSecond line  ");
+
+    assertThat(normalizedContent).isEqualTo("First line\nSecond line");
+  }
+
+  @Test
   void rejectsBlankContent() {
     assertThatIllegalArgumentException()
         .isThrownBy(() -> new Message(MESSAGE_ID, CIRCLE_ID, USER_ID, " \n\t", CREATED_AT))

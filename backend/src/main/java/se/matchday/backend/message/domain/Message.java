@@ -16,11 +16,22 @@ public record Message(
     Objects.requireNonNull(content, "content must not be null");
     Objects.requireNonNull(createdAt, "createdAt must not be null");
 
-    if (content.isBlank()) {
-      throw new IllegalArgumentException("content must not be blank");
-    }
+    validateContent(content);
     if (!content.equals(content.strip())) {
       throw new IllegalArgumentException("content must not have surrounding whitespace");
+    }
+  }
+
+  public static String normalizeContent(String content) {
+    Objects.requireNonNull(content, "content must not be null");
+    String normalizedContent = content.strip();
+    validateContent(normalizedContent);
+    return normalizedContent;
+  }
+
+  private static void validateContent(String content) {
+    if (content.isBlank()) {
+      throw new IllegalArgumentException("content must not be blank");
     }
     if (content.indexOf('\0') >= 0) {
       throw new IllegalArgumentException("content must not contain null characters");
