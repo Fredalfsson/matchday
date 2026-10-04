@@ -7,7 +7,7 @@ säkerhetskontroller.
 Backend stöder manuell import och uppdatering av matchdata från TheSportsDB, ett publikt API för
 matcher som har sparats i PostgreSQL samt ett API där en autentiserad användare med en
 applikationsidentitet kan skapa, läsa, ansluta till och lämna en diskussionsgrupp (`circle`) för
-en match.
+en match. Aktiva circle-medlemmar kan också skicka meddelanden.
 
 ## Teknik
 
@@ -26,8 +26,9 @@ domän och infrastruktur. PostgreSQL är primär datakälla. TheSportsDB-integra
 det interna gränssnittet `MatchDataProvider`, vilket håller leverantörens datamodell utanför
 domänmodellen och det publika API-kontraktet.
 
-Stödet för circles följer samma struktur. Gränssnittet `CurrentUser` skiljer applikationslogiken
-från den ännu ofärdiga autentiseringsintegrationen.
+Stödet för circles och meddelanden följer samma struktur. Gränssnittet `CurrentUser` skiljer
+applikationslogiken från den ännu ofärdiga autentiseringsintegrationen. `UserDirectory` hämtar
+publika användarnamn till meddelandesvar utan att exponera internt användar-ID eller e-postadress.
 
 ## Projektstruktur
 
@@ -88,6 +89,7 @@ Svaret är `[]` om databasen ännu inte innehåller några matcher. Fortsätt d�
 | `POST /api/v1/matches/{matchId}/circle` | Autentiserad med applikationsidentitet | Skapar matchens circle och aktiverar skaparens medlemskap |
 | `PUT /api/v1/matches/{matchId}/circle/membership` | Autentiserad med applikationsidentitet | Aktiverar användarens medlemskap idempotent |
 | `DELETE /api/v1/matches/{matchId}/circle/membership` | Autentiserad med applikationsidentitet | Avslutar användarens medlemskap idempotent |
+| `POST /api/v1/circles/{circleId}/messages` | Aktiv circle-medlem med applikationsidentitet | Skapar ett meddelande i circle |
 | `POST /api/v1/admin/match-imports` | Rollen `MATCH_IMPORTER` | Importerar eller uppdaterar angiven säsong |
 
 Matchlistan sorteras efter säsong, omgång, datum, avsparkstid och internt match-id. Frontend
@@ -95,7 +97,7 @@ ansvarar för filtrering och uppdelning mellan kommande och spelade matcher.
 
 API-kontraktet finns i [`docs/openapi.yaml`](docs/openapi.yaml) och följer OpenAPI 3.1.0.
 
-### Circle-stöd i nuvarande backend
+### Circle- och meddelandestöd i nuvarande backend
 
 - En match kan ha noll eller en circle.
 - Circle skapas först när en autentiserad användare med en tillgänglig applikationsidentitet
@@ -111,12 +113,18 @@ API-kontraktet finns i [`docs/openapi.yaml`](docs/openapi.yaml) och följer Open
   användar-ID eller e-postadress.
 - Samtidiga skapandeförsök skyddas av databasens unika villkor. Ett anrop får `201 Created` och
   övriga får `409 Conflict`.
+- Endast aktiva medlemmar kan skicka meddelanden. Svaret visar författarens publika användarnamn,
+  men inte internt användar-ID eller e-postadress.
+- Meddelandeinnehåll normaliseras genom att omgivande blanksteg tas bort. Innehållet måste vara
+  1–1000 Unicode-tecken och får inte innehålla null-tecken.
+- Sparade meddelanden ligger kvar när en medlem lämnar. API-stöd för att läsa meddelandehistorik
+  är ännu inte implementerat.
 
-Stöd för att skicka meddelanden är ännu inte implementerat.
 Den lokala Basic Auth-profilen autentiserar administrativa importanrop men kopplar
 inte inloggningen till ett användar-ID i domänen. Circle-anrop kräver därför auth-modulens framtida
-`CurrentUser`-adapter. Backendens automatiserade tester använder en avgränsad testadapter så att
-arbetet med circles inte blockeras av auth-utvecklingen.
+`CurrentUser`-adapter. Meddelandeanrop kräver dessutom en `UserDirectory`-adapter för publika
+användarnamn. Backendens automatiserade tester använder avgränsade testimplementationer så att
+arbetet med circles och meddelanden inte blockeras av auth-utvecklingen.
 
 ## Manuell matchimport lokalt
 

@@ -4,7 +4,7 @@ info:
   version: 0.1.0
   description: >-
     API for importing and reading Allsvenskan matches and creating, reading, joining, and leaving
-    match circles.
+    match circles. Active circle members can also create messages.
 servers:
   - url: http://127.0.0.1:8080
     description: Local development
@@ -13,6 +13,8 @@ tags:
     description: Read-only access to matches stored by Matchday.
   - name: Circles
     description: Match-linked discussion circles and their memberships.
+  - name: Messages
+    description: Messages created by active members in discussion circles.
   - name: Match imports
     description: Administrative operations for importing or refreshing match data.
 paths:
@@ -356,6 +358,140 @@ paths:
                       10000000-0000-0000-0000-000000000001
                     instance: >-
                       /api/v1/matches/10000000-0000-0000-0000-000000000001/circle/membership
+  /api/v1/circles/{circleId}/messages:
+    parameters:
+      - name: circleId
+        in: path
+        required: true
+        description: ID of the discussion circle where the message is created.
+        schema:
+          type: string
+          format: uuid
+    post:
+      tags:
+        - Messages
+      summary: Create a circle message
+      description: >-
+        Creates a message for the authenticated user when that user has an active membership in
+        the circle. The response exposes the author's public username, but not an internal user ID
+        or email address. The declared Basic Auth scheme applies to the documented local server;
+        the production authentication mechanism will be supplied by the authentication integration
+        and is intentionally not fixed by this contract yet.
+      operationId: createCircleMessage
+      security:
+        - localBasicAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageCreationRequest"
+      responses:
+        "201":
+          description: Message created
+          headers:
+            Location:
+              description: Relative URI of the created message.
+              required: true
+              schema:
+                type: string
+                format: uri-reference
+              example: /api/v1/circles/40000000-0000-0000-0000-000000000001/messages/50000000-0000-0000-0000-000000000001
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "400":
+          description: The path, request body, or message content is invalid
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                malformedPath:
+                  summary: Invalid circle ID
+                  value:
+                    type: urn:matchday:problem:invalid-request
+                    title: Invalid request
+                    status: 400
+                    detail: The request path contains an invalid value
+                    instance: /api/v1/circles/not-a-uuid/messages
+                malformedBody:
+                  summary: Missing or malformed JSON body
+                  value:
+                    type: urn:matchday:problem:invalid-request
+                    title: Invalid request
+                    status: 400
+                    detail: The request body is missing or malformed
+                    instance: >-
+                      /api/v1/circles/40000000-0000-0000-0000-000000000001/messages
+                invalidContent:
+                  summary: Invalid message content
+                  value:
+                    type: urn:matchday:problem:invalid-message-content
+                    title: Invalid message content
+                    status: 400
+                    detail: >-
+                      Message content must be between 1 and 1000 characters and must not contain
+                      null characters
+                    instance: >-
+                      /api/v1/circles/40000000-0000-0000-0000-000000000001/messages
+        "401":
+          description: >-
+            Authentication is required. The security layer may return this status without a body;
+            an authenticated request whose application identity cannot be resolved returns a
+            problem detail.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              example:
+                type: urn:matchday:problem:authentication-required
+                title: Authentication required
+                status: 401
+                detail: An authenticated user identity is required
+                instance: /api/v1/circles/40000000-0000-0000-0000-000000000001/messages
+        "403":
+          description: >-
+            The authenticated user does not have an active membership in the circle, or the request
+            is rejected by the active security policy, for example because a valid CSRF token is
+            missing. Security-layer rejections may not include a problem detail body.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              example:
+                type: urn:matchday:problem:active-circle-membership-required
+                title: Active circle membership required
+                status: 403
+                detail: >-
+                  An active membership is required for circle
+                  40000000-0000-0000-0000-000000000001
+                instance: /api/v1/circles/40000000-0000-0000-0000-000000000001/messages
+        "404":
+          description: The circle does not exist
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              example:
+                type: urn:matchday:problem:circle-not-found
+                title: Circle not found
+                status: 404
+                detail: Circle 40000000-0000-0000-0000-000000000099 was not found
+                instance: /api/v1/circles/40000000-0000-0000-0000-000000000099/messages
+        "503":
+          description: The public user directory cannot resolve the author's username
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              example:
+                type: urn:matchday:problem:user-directory-unavailable
+                title: User directory unavailable
+                status: 503
+                detail: The public user directory is unavailable
+                instance: /api/v1/circles/40000000-0000-0000-0000-000000000001/messages
   /api/v1/admin/match-imports:
     post:
       tags:
@@ -435,8 +571,9 @@ components:
       type: http
       scheme: basic
       description: >-
-        Basic Auth supplied by the local profile. Circle operations additionally require an
-        authentication adapter that resolves the credentials to a stable application user ID.
+        Basic Auth supplied by the local profile. Circle and message operations additionally
+        require an authentication adapter that resolves the credentials to a stable application
+        user ID.
   schemas:
     Match:
       type: object
@@ -525,6 +662,46 @@ components:
         membershipActive:
           type: boolean
           description: Whether the authenticated user currently has an active membership.
+    MessageCreationRequest:
+      type: object
+      required:
+        - content
+      properties:
+        content:
+          type: string
+          minLength: 1
+          description: >-
+            Message text. Surrounding whitespace is removed while internal whitespace and line
+            breaks are preserved. After normalization, content must contain 1 to 1000 Unicode
+            characters. Blank values and null characters are rejected.
+    Message:
+      type: object
+      description: >-
+        A created circle message. The author's public username is exposed, but the internal user ID
+        and email address are not.
+      required:
+        - id
+        - circleId
+        - content
+        - authorUsername
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        circleId:
+          type: string
+          format: uuid
+        content:
+          type: string
+          minLength: 1
+          maxLength: 1000
+        authorUsername:
+          type: string
+          minLength: 1
+        createdAt:
+          type: string
+          format: date-time
     ProblemDetail:
       type: object
       description: RFC 9457 problem details returned for application-level API errors.
