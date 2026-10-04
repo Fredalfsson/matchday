@@ -65,6 +65,16 @@ paths:
                 $ref: "#/components/schemas/Circle"
         "400":
           description: The matchId path parameter is not a valid UUID
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              example:
+                type: urn:matchday:problem:invalid-request
+                title: Invalid request
+                status: 400
+                detail: The request path contains an invalid value
+                instance: /api/v1/matches/not-a-uuid/circle
         "401":
           description: >-
             Authentication is required. The security layer may return this status without a body;
@@ -134,6 +144,16 @@ paths:
                 $ref: "#/components/schemas/Circle"
         "400":
           description: The matchId path parameter is not a valid UUID
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              example:
+                type: urn:matchday:problem:invalid-request
+                title: Invalid request
+                status: 400
+                detail: The request path contains an invalid value
+                instance: /api/v1/matches/not-a-uuid/circle
         "401":
           description: >-
             Authentication is required. The security layer may return this status without a body;
@@ -204,6 +224,16 @@ paths:
           description: Membership is active
         "400":
           description: The matchId path parameter is not a valid UUID
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              example:
+                type: urn:matchday:problem:invalid-request
+                title: Invalid request
+                status: 400
+                detail: The request path contains an invalid value
+                instance: /api/v1/matches/not-a-uuid/circle/membership
         "401":
           description: >-
             Authentication is required. The security layer may return this status without a body;
@@ -269,6 +299,16 @@ paths:
           description: Membership is inactive
         "400":
           description: The matchId path parameter is not a valid UUID
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              example:
+                type: urn:matchday:problem:invalid-request
+                title: Invalid request
+                status: 400
+                detail: The request path contains an invalid value
+                instance: /api/v1/matches/not-a-uuid/circle/membership
         "401":
           description: >-
             Authentication is required. The security layer may return this status without a body;
