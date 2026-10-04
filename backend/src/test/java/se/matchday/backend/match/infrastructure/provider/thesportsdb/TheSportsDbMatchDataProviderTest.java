@@ -8,9 +8,14 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.Collections;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.client.HttpServerErrorException;
+import se.matchday.backend.match.application.InvalidMatchDataProviderResponseException;
+import se.matchday.backend.match.application.MatchDataProviderUnavailableException;
 import se.matchday.backend.match.application.ProviderMatch;
 import se.matchday.backend.match.domain.MatchStatus;
 import se.matchday.backend.match.infrastructure.provider.thesportsdb.dto.TheSportsDbEventDto;
@@ -63,8 +68,65 @@ class TheSportsDbMatchDataProviderTest {
     TheSportsDbMatchDataProvider provider = provider(new RecordingClient(null));
 
     assertThatThrownBy(() -> provider.fetchRound(2026, 1))
-        .isInstanceOf(IllegalStateException.class)
+        .isInstanceOf(InvalidMatchDataProviderResponseException.class)
         .hasMessage("TheSportsDB returned an empty response body");
+  }
+
+  @Test
+  void translatesHttpFailuresToProviderUnavailability() {
+    HttpServerErrorException failure =
+        new HttpServerErrorException(HttpStatus.SERVICE_UNAVAILABLE, "provider unavailable");
+    TheSportsDbClient client =
+        (apiKey, leagueId, round, season) -> {
+          throw failure;
+        };
+    TheSportsDbMatchDataProvider provider = provider(client);
+
+    assertThatThrownBy(() -> provider.fetchRound(2026, 1))
+        .isInstanceOf(MatchDataProviderUnavailableException.class)
+        .hasMessage("TheSportsDB request failed")
+        .hasCause(failure);
+  }
+
+  @Test
+  void translatesInvalidMappedDataToAnInvalidProviderResponse() {
+    TheSportsDbEventDto invalidEvent =
+        new TheSportsDbEventDto(
+            "2398752",
+            "2026",
+            "1",
+            "134728",
+            "A".repeat(256),
+            "134724",
+            "Sirius",
+            "2026-04-04",
+            "13:00:00",
+            "2026-04-04T13:00:00",
+            "0",
+            "3",
+            "FT",
+            "no",
+            "17256",
+            "Stora Valla");
+    TheSportsDbMatchDataProvider provider =
+        provider(new RecordingClient(new TheSportsDbEventsResponseDto(List.of(invalidEvent))));
+
+    assertThatThrownBy(() -> provider.fetchRound(2026, 1))
+        .isInstanceOf(InvalidMatchDataProviderResponseException.class)
+        .hasMessage("TheSportsDB returned invalid match data")
+        .hasCauseInstanceOf(TheSportsDbMappingException.class);
+  }
+
+  @Test
+  void translatesANullEventToAnInvalidProviderResponse() {
+    TheSportsDbMatchDataProvider provider =
+        provider(
+            new RecordingClient(new TheSportsDbEventsResponseDto(Collections.singletonList(null))));
+
+    assertThatThrownBy(() -> provider.fetchRound(2026, 1))
+        .isInstanceOf(InvalidMatchDataProviderResponseException.class)
+        .hasMessage("TheSportsDB returned invalid match data")
+        .hasCauseInstanceOf(TheSportsDbMappingException.class);
   }
 
   @Test
@@ -88,7 +150,7 @@ class TheSportsDbMatchDataProviderTest {
     assertThat(properties.toString()).doesNotContain("test-key").contains("apiKey=***");
   }
 
-  private TheSportsDbMatchDataProvider provider(RecordingClient client) {
+  private TheSportsDbMatchDataProvider provider(TheSportsDbClient client) {
     TheSportsDbProperties properties = properties();
     TheSportsDbRequestExecutor requestExecutor =
         new TheSportsDbRequestExecutor(

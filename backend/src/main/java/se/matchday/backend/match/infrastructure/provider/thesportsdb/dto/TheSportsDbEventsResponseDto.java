@@ -7,4 +7,4 @@ import org.jspecify.annotations.Nullable;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record TheSportsDbEventsResponseDto(
-    @JsonProperty("events") @Nullable List<TheSportsDbEventDto> events) {}
+    @JsonProperty("events") @Nullable List<@Nullable TheSportsDbEventDto> events) {}

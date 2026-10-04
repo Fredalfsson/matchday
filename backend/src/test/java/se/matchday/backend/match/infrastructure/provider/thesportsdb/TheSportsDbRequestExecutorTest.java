@@ -22,6 +22,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.client.HttpClientErrorException;
+import se.matchday.backend.match.application.MatchDataProviderUnavailableException;
 
 class TheSportsDbRequestExecutorTest {
 
@@ -156,7 +157,7 @@ class TheSportsDbRequestExecutorTest {
     executor.execute(() -> "first");
     try {
       assertThatThrownBy(() -> executor.execute(() -> "second"))
-          .isInstanceOf(IllegalStateException.class)
+          .isInstanceOf(MatchDataProviderUnavailableException.class)
           .hasMessage("Interrupted while waiting to call TheSportsDB")
           .hasCauseInstanceOf(InterruptedException.class);
       assertThat(Thread.currentThread().isInterrupted()).isTrue();

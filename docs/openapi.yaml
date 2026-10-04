@@ -380,10 +380,55 @@ paths:
                 $ref: "#/components/schemas/MatchImportResponse"
         "400":
           description: Invalid request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                invalidSeason:
+                  summary: Missing or non-positive season
+                  value:
+                    type: urn:matchday:problem:invalid-request
+                    title: Invalid request
+                    status: 400
+                    detail: The request body must contain a positive integer season
+                    instance: /api/v1/admin/match-imports
+                malformedBody:
+                  summary: Missing or malformed JSON body
+                  value:
+                    type: urn:matchday:problem:invalid-request
+                    title: Invalid request
+                    status: 400
+                    detail: The request body is missing or malformed
+                    instance: /api/v1/admin/match-imports
         "401":
           description: Authentication required
         "403":
           description: Insufficient permissions
+        "502":
+          description: The match data provider returned an invalid response
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              example:
+                type: urn:matchday:problem:invalid-match-provider-response
+                title: Invalid match provider response
+                status: 502
+                detail: The match data provider returned an invalid response
+                instance: /api/v1/admin/match-imports
+        "503":
+          description: The match data provider is unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              example:
+                type: urn:matchday:problem:match-provider-unavailable
+                title: Match provider unavailable
+                status: 503
+                detail: The match data provider is unavailable
+                instance: /api/v1/admin/match-imports
 components:
   securitySchemes:
     localBasicAuth:

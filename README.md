@@ -144,7 +144,10 @@ curl --fail-with-body \
 Importen hämtar 30 omgångar sekventiellt och kan ta över en minut. `curl` visar inget medan
 anropet pågår utan skriver svaret först när importen är klar. Om TheSportsDB svarar med `429 Too
 Many Requests` väntar backend enligt `Retry-After` innan den försöker igen, vilket kan förlänga
-körtiden. Återförsök och eventuella fel visas i terminalen där backend körs.
+körtiden. Återförsök och eventuella fel visas i terminalen där backend körs. API:t svarar med ett
+sanerat problem detail: `502 Bad Gateway` när providern returnerar ogiltiga matchdata och `503
+Service Unavailable` när providern inte kan nås. Interna providerfel och konfigurationsdetaljer
+exponeras inte i svaret.
 
 Alla 240 matcher finns inte nödvändigtvis hos providern när säsongens spelschema börjar
 fastställas. Importen sparar därför de matcher som finns och kan köras igen för att fylla på nya

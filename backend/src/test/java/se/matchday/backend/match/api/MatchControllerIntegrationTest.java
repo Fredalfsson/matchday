@@ -1,5 +1,6 @@
 package se.matchday.backend.match.api;
 
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -14,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import se.matchday.backend.TestcontainersConfiguration;
@@ -90,5 +92,44 @@ class MatchControllerIntegrationTest {
         .andExpect(jsonPath("$[0].externalMatchId").doesNotExist())
         .andExpect(jsonPath("$[0].homeTeamExternalId").doesNotExist())
         .andExpect(jsonPath("$[0].awayTeamExternalId").doesNotExist());
+  }
+
+  @Test
+  void includesNullableFieldsForAScheduledMatch() throws Exception {
+    matchRepository.saveAll(
+        List.of(
+            new ProviderMatch(
+                "provider-event-scheduled",
+                2026,
+                2,
+                "provider-home-2",
+                "AIK",
+                "provider-away-2",
+                "Halmstad",
+                LocalDate.of(2026, 4, 12),
+                null,
+                null,
+                null,
+                MatchStatus.SCHEDULED,
+                null)));
+
+    mockMvc
+        .perform(get("/api/v1/matches"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].kickoffAt").hasJsonPath())
+        .andExpect(jsonPath("$[0].kickoffAt").value(nullValue()))
+        .andExpect(jsonPath("$[0].homeScore").hasJsonPath())
+        .andExpect(jsonPath("$[0].homeScore").value(nullValue()))
+        .andExpect(jsonPath("$[0].awayScore").hasJsonPath())
+        .andExpect(jsonPath("$[0].awayScore").value(nullValue()))
+        .andExpect(jsonPath("$[0].venueName").hasJsonPath())
+        .andExpect(jsonPath("$[0].venueName").value(nullValue()));
+  }
+
+  @Test
+  void rejectsAnUnsupportedResponseMediaType() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/matches").accept(MediaType.APPLICATION_XML))
+        .andExpect(status().isNotAcceptable());
   }
 }
