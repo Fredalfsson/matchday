@@ -46,7 +46,7 @@ public final class MessageCreationService {
       throw new ActiveCircleMembershipRequiredException(circleId);
     }
 
-    String normalizedContent = Message.normalizeContent(content);
+    String normalizedContent = normalizeContent(content);
     String authorUsername = findAuthorUsername(userId);
     Message message =
         messageRepository
@@ -64,5 +64,13 @@ public final class MessageCreationService {
       throw new UserDirectoryUnavailableException();
     }
     return username;
+  }
+
+  private static String normalizeContent(String content) {
+    try {
+      return Message.normalizeContent(content);
+    } catch (IllegalArgumentException exception) {
+      throw new InvalidMessageContentException(exception);
+    }
   }
 }

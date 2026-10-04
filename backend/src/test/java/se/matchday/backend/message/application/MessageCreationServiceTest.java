@@ -1,7 +1,6 @@
 package se.matchday.backend.message.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -93,9 +92,9 @@ class MessageCreationServiceTest {
   void validatesNormalizedContentBeforeLookingUpTheAuthor() {
     allowActiveMembership();
 
-    assertThatIllegalArgumentException()
-        .isThrownBy(() -> service(currentUser).createForCircle(CIRCLE_ID, " \n\t "))
-        .withMessage("content must not be blank");
+    assertThatThrownBy(() -> service(currentUser).createForCircle(CIRCLE_ID, " \n\t "))
+        .isInstanceOf(InvalidMessageContentException.class)
+        .hasMessage("content must not be blank");
     verifyNoInteractions(userDirectory, messageRepository);
   }
 
