@@ -73,6 +73,18 @@ curl --fail-with-body http://127.0.0.1:8080/api/v1/matches
 Svaret är `[]` om databasen ännu inte innehåller några matcher. Fortsätt då med avsnittet
 [Manuell matchimport lokalt](#manuell-matchimport-lokalt).
 
+### Starta hela stacken med Docker Compose
+
+Från projektroten startar du frontend, backend och PostgreSQL tillsammans:
+
+```bash
+docker compose up --build
+```
+
+Frontend finns på `http://localhost:3000`, backend på `http://localhost:8080` och PostgreSQL på
+`localhost:5432`. Backend kör databasens Flyway-migreringar automatiskt. Avsluta med `Ctrl+C`
+och kör `docker compose down` för att stoppa tjänsterna utan att radera databasvolymen.
+
 ## API
 
 | Metod och sökväg | Åtkomst | Beskrivning |
