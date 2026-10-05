@@ -11,6 +11,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import se.matchday.backend.circle.application.ActiveCircleMembershipRequiredException;
 import se.matchday.backend.circle.application.CircleNotFoundByIdException;
 import se.matchday.backend.message.application.InvalidMessageContentException;
+import se.matchday.backend.message.application.InvalidMessagePaginationException;
 
 @RestControllerAdvice(assignableTypes = MessageController.class)
 class MessageExceptionHandler {
@@ -21,6 +22,8 @@ class MessageExceptionHandler {
       URI.create("urn:matchday:problem:active-circle-membership-required");
   private static final URI INVALID_MESSAGE_CONTENT_TYPE =
       URI.create("urn:matchday:problem:invalid-message-content");
+  private static final URI INVALID_MESSAGE_PAGINATION_TYPE =
+      URI.create("urn:matchday:problem:invalid-message-pagination");
   private static final URI INVALID_REQUEST_TYPE =
       URI.create("urn:matchday:problem:invalid-request");
 
@@ -57,13 +60,33 @@ class MessageExceptionHandler {
         "The request body is missing or malformed");
   }
 
+  @ExceptionHandler(InvalidMessagePaginationException.class)
+  ProblemDetail handleInvalidMessagePagination(InvalidMessagePaginationException exception) {
+    return problem(
+        HttpStatus.BAD_REQUEST,
+        INVALID_MESSAGE_PAGINATION_TYPE,
+        "Invalid message pagination",
+        exception.getMessage());
+  }
+
   @ExceptionHandler(MethodArgumentTypeMismatchException.class)
-  ProblemDetail handleInvalidPathParameter(MethodArgumentTypeMismatchException exception) {
+  ProblemDetail handleInvalidParameter(MethodArgumentTypeMismatchException exception) {
+    if (isPaginationParameter(exception.getName())) {
+      return problem(
+          HttpStatus.BAD_REQUEST,
+          INVALID_MESSAGE_PAGINATION_TYPE,
+          "Invalid message pagination",
+          "The " + exception.getName() + " query parameter must be a valid integer");
+    }
     return problem(
         HttpStatus.BAD_REQUEST,
         INVALID_REQUEST_TYPE,
         "Invalid request",
         "The request path contains an invalid value");
+  }
+
+  private static boolean isPaginationParameter(String parameterName) {
+    return "page".equals(parameterName) || "size".equals(parameterName);
   }
 
   private static ProblemDetail problem(HttpStatus status, URI type, String title, String detail) {

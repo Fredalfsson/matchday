@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -12,6 +13,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.jayway.jsonpath.JsonPath;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -19,6 +23,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -59,6 +65,8 @@ class MessageControllerIntegrationTest {
       UUID.fromString("30000000-0000-0000-0000-000000000002");
   private static final UUID DIRECTORY_UNAVAILABLE_USER_ID =
       UUID.fromString("30000000-0000-0000-0000-000000000003");
+  private static final UUID SECOND_AUTHOR_USER_ID =
+      UUID.fromString("30000000-0000-0000-0000-000000000004");
   private static final Instant CREATED_AT = Instant.parse("2026-10-04T08:00:00Z");
 
   private final MockMvc mockMvc;
@@ -86,6 +94,271 @@ class MessageControllerIntegrationTest {
   @AfterEach
   void cleanUpTest() {
     clearDatabase();
+  }
+
+  @Test
+  void readsStablePaginatedMessageHistoryForAnActiveMemberWithoutCsrfProtection() throws Exception {
+    Circle requestedCircle = storeCircleWithCreator(MEMBER_USER_ID, "message-history-requested");
+    Circle otherCircle = storeCircleWithCreator(MEMBER_USER_ID, "message-history-other");
+    UUID oldestMessageId = UUID.fromString("40000000-0000-0000-0000-000000000001");
+    UUID lowerNewestMessageId = UUID.fromString("40000000-0000-0000-0000-000000000002");
+    UUID higherNewestMessageId = UUID.fromString("40000000-0000-0000-0000-000000000003");
+    insertMessage(
+        oldestMessageId, requestedCircle.id(), MEMBER_USER_ID, "Oldest message", CREATED_AT);
+    insertMessage(
+        lowerNewestMessageId,
+        requestedCircle.id(),
+        MEMBER_USER_ID,
+        "Newest lower id",
+        CREATED_AT.plusSeconds(1));
+    insertMessage(
+        higherNewestMessageId,
+        requestedCircle.id(),
+        SECOND_AUTHOR_USER_ID,
+        "Newest higher id",
+        CREATED_AT.plusSeconds(1));
+    insertMessage(
+        UUID.fromString("40000000-0000-0000-0000-000000000004"),
+        otherCircle.id(),
+        MEMBER_USER_ID,
+        "Other circle",
+        CREATED_AT.plusSeconds(2));
+
+    mockMvc
+        .perform(
+            get("/api/v1/circles/{circleId}/messages", requestedCircle.id())
+                .with(user(MEMBER_USERNAME))
+                .param("page", "0")
+                .param("size", "2"))
+        .andExpect(status().isOk())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+        .andExpect(jsonPath("$.messages.length()").value(2))
+        .andExpect(jsonPath("$.messages[0].id").value(higherNewestMessageId.toString()))
+        .andExpect(jsonPath("$.messages[0].circleId").value(requestedCircle.id().toString()))
+        .andExpect(jsonPath("$.messages[0].content").value("Newest higher id"))
+        .andExpect(jsonPath("$.messages[0].authorUsername").value("alex"))
+        .andExpect(jsonPath("$.messages[0].createdAt").value(CREATED_AT.plusSeconds(1).toString()))
+        .andExpect(jsonPath("$.messages[0].authorUserId").doesNotExist())
+        .andExpect(jsonPath("$.messages[0].email").doesNotExist())
+        .andExpect(jsonPath("$.messages[1].id").value(lowerNewestMessageId.toString()))
+        .andExpect(jsonPath("$.messages[1].authorUsername").value("sara"))
+        .andExpect(jsonPath("$.page").value(0))
+        .andExpect(jsonPath("$.size").value(2))
+        .andExpect(jsonPath("$.hasNext").value(true));
+
+    mockMvc
+        .perform(
+            get("/api/v1/circles/{circleId}/messages", requestedCircle.id())
+                .with(user(MEMBER_USERNAME))
+                .param("page", "1")
+                .param("size", "2"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.messages.length()").value(1))
+        .andExpect(jsonPath("$.messages[0].id").value(oldestMessageId.toString()))
+        .andExpect(jsonPath("$.page").value(1))
+        .andExpect(jsonPath("$.size").value(2))
+        .andExpect(jsonPath("$.hasNext").value(false));
+
+    assertThat(rowCount("messages")).isEqualTo(4);
+  }
+
+  @Test
+  void readsAnEmptyMessageHistoryWithDefaultPagination() throws Exception {
+    Circle circle = storeCircleWithCreator(MEMBER_USER_ID);
+
+    mockMvc
+        .perform(
+            get("/api/v1/circles/{circleId}/messages", circle.id()).with(user(MEMBER_USERNAME)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.messages").isEmpty())
+        .andExpect(jsonPath("$.page").value(0))
+        .andExpect(jsonPath("$.size").value(50))
+        .andExpect(jsonPath("$.hasNext").value(false));
+  }
+
+  @Test
+  void rejectsAnonymousMessageHistoryAccess() throws Exception {
+    Circle circle = storeCircleWithCreator(MEMBER_USER_ID);
+
+    mockMvc
+        .perform(get("/api/v1/circles/{circleId}/messages", circle.id()))
+        .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void rejectsMessageHistoryWhenTheAuthenticatedIdentityCannotBeResolved() throws Exception {
+    Circle circle = storeCircleWithCreator(MEMBER_USER_ID);
+
+    mockMvc
+        .perform(
+            get("/api/v1/circles/{circleId}/messages", circle.id()).with(user(UNMAPPED_USERNAME)))
+        .andExpect(status().isUnauthorized())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.type").value("urn:matchday:problem:authentication-required"))
+        .andExpect(jsonPath("$.title").value("Authentication required"))
+        .andExpect(jsonPath("$.status").value(401))
+        .andExpect(jsonPath("$.detail").value("An authenticated user identity is required"))
+        .andExpect(jsonPath("$.trace").doesNotExist())
+        .andExpect(jsonPath("$.exception").doesNotExist());
+  }
+
+  @Test
+  void rejectsMessageHistoryWithAMalformedCircleId() throws Exception {
+    mockMvc
+        .perform(
+            get("/api/v1/circles/{circleId}/messages", "not-a-uuid").with(user(MEMBER_USERNAME)))
+        .andExpect(status().isBadRequest())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.type").value("urn:matchday:problem:invalid-request"))
+        .andExpect(jsonPath("$.title").value("Invalid request"))
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.detail").value("The request path contains an invalid value"))
+        .andExpect(jsonPath("$.trace").doesNotExist())
+        .andExpect(jsonPath("$.exception").doesNotExist());
+  }
+
+  @Test
+  void rejectsMessageHistoryForAnInactiveMember() throws Exception {
+    Circle circle = storeCircleWithCreator(MEMBER_USER_ID);
+    insertMessage(
+        UUID.randomUUID(),
+        circle.id(),
+        MEMBER_USER_ID,
+        "Private history",
+        CREATED_AT.plusSeconds(1));
+
+    mockMvc
+        .perform(
+            get("/api/v1/circles/{circleId}/messages", circle.id()).with(user(NON_MEMBER_USERNAME)))
+        .andExpect(status().isForbidden())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(
+            jsonPath("$.type").value("urn:matchday:problem:active-circle-membership-required"))
+        .andExpect(jsonPath("$.title").value("Active circle membership required"))
+        .andExpect(jsonPath("$.status").value(403))
+        .andExpect(
+            jsonPath("$.detail")
+                .value("An active membership is required for circle " + circle.id()))
+        .andExpect(jsonPath("$.messages").doesNotExist())
+        .andExpect(jsonPath("$.trace").doesNotExist())
+        .andExpect(jsonPath("$.exception").doesNotExist());
+  }
+
+  @Test
+  void rejectsMessageHistoryForAnUnknownCircle() throws Exception {
+    UUID unknownCircleId = UUID.fromString("40000000-0000-0000-0000-000000000099");
+
+    mockMvc
+        .perform(
+            get("/api/v1/circles/{circleId}/messages", unknownCircleId).with(user(MEMBER_USERNAME)))
+        .andExpect(status().isNotFound())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.type").value("urn:matchday:problem:circle-not-found"))
+        .andExpect(jsonPath("$.title").value("Circle not found"))
+        .andExpect(jsonPath("$.status").value(404))
+        .andExpect(jsonPath("$.detail").value("Circle " + unknownCircleId + " was not found"))
+        .andExpect(jsonPath("$.trace").doesNotExist())
+        .andExpect(jsonPath("$.exception").doesNotExist());
+  }
+
+  @Test
+  void rejectsMessageHistoryWithANegativePage() throws Exception {
+    Circle circle = storeCircleWithCreator(MEMBER_USER_ID);
+
+    mockMvc
+        .perform(
+            get("/api/v1/circles/{circleId}/messages", circle.id())
+                .with(user(MEMBER_USERNAME))
+                .param("page", "-1"))
+        .andExpect(status().isBadRequest())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.type").value("urn:matchday:problem:invalid-message-pagination"))
+        .andExpect(jsonPath("$.title").value("Invalid message pagination"))
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.detail").value("page must be zero or greater"))
+        .andExpect(jsonPath("$.trace").doesNotExist())
+        .andExpect(jsonPath("$.exception").doesNotExist());
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {0, 101})
+  void rejectsMessageHistoryWithAPageSizeOutsideTheAllowedRange(int size) throws Exception {
+    Circle circle = storeCircleWithCreator(MEMBER_USER_ID);
+
+    mockMvc
+        .perform(
+            get("/api/v1/circles/{circleId}/messages", circle.id())
+                .with(user(MEMBER_USERNAME))
+                .param("size", Integer.toString(size)))
+        .andExpect(status().isBadRequest())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.type").value("urn:matchday:problem:invalid-message-pagination"))
+        .andExpect(jsonPath("$.title").value("Invalid message pagination"))
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.detail").value("size must be between 1 and 100"))
+        .andExpect(jsonPath("$.trace").doesNotExist())
+        .andExpect(jsonPath("$.exception").doesNotExist());
+  }
+
+  @Test
+  void rejectsMessageHistoryWithANonNumericPage() throws Exception {
+    Circle circle = storeCircleWithCreator(MEMBER_USER_ID);
+
+    mockMvc
+        .perform(
+            get("/api/v1/circles/{circleId}/messages", circle.id())
+                .with(user(MEMBER_USERNAME))
+                .param("page", "first"))
+        .andExpect(status().isBadRequest())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.type").value("urn:matchday:problem:invalid-message-pagination"))
+        .andExpect(jsonPath("$.title").value("Invalid message pagination"))
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.detail").value("The page query parameter must be a valid integer"))
+        .andExpect(jsonPath("$.trace").doesNotExist())
+        .andExpect(jsonPath("$.exception").doesNotExist());
+  }
+
+  @Test
+  void rejectsMessageHistoryWithANonNumericPageSize() throws Exception {
+    Circle circle = storeCircleWithCreator(MEMBER_USER_ID);
+
+    mockMvc
+        .perform(
+            get("/api/v1/circles/{circleId}/messages", circle.id())
+                .with(user(MEMBER_USERNAME))
+                .param("size", "many"))
+        .andExpect(status().isBadRequest())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.type").value("urn:matchday:problem:invalid-message-pagination"))
+        .andExpect(jsonPath("$.title").value("Invalid message pagination"))
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.detail").value("The size query parameter must be a valid integer"))
+        .andExpect(jsonPath("$.trace").doesNotExist())
+        .andExpect(jsonPath("$.exception").doesNotExist());
+  }
+
+  @Test
+  void rejectsMessageHistoryWhenAnAuthorUsernameCannotBeResolved() throws Exception {
+    Circle circle = storeCircleWithCreator(MEMBER_USER_ID);
+    insertMessage(
+        UUID.randomUUID(),
+        circle.id(),
+        DIRECTORY_UNAVAILABLE_USER_ID,
+        "Unavailable author",
+        CREATED_AT.plusSeconds(1));
+
+    mockMvc
+        .perform(
+            get("/api/v1/circles/{circleId}/messages", circle.id()).with(user(MEMBER_USERNAME)))
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.type").value("urn:matchday:problem:user-directory-unavailable"))
+        .andExpect(jsonPath("$.title").value("User directory unavailable"))
+        .andExpect(jsonPath("$.status").value(503))
+        .andExpect(jsonPath("$.detail").value("The public user directory is unavailable"))
+        .andExpect(jsonPath("$.trace").doesNotExist())
+        .andExpect(jsonPath("$.exception").doesNotExist());
   }
 
   @Test
@@ -544,15 +817,19 @@ class MessageControllerIntegrationTest {
   }
 
   private Circle storeCircleWithCreator(UUID creatorUserId) {
-    UUID matchId = storeMatch();
+    return storeCircleWithCreator(creatorUserId, "message-controller-test-match");
+  }
+
+  private Circle storeCircleWithCreator(UUID creatorUserId, String externalMatchId) {
+    UUID matchId = storeMatch(externalMatchId);
     return circleRepository.createWithCreatorMembership(matchId, creatorUserId, CREATED_AT);
   }
 
-  private UUID storeMatch() {
+  private UUID storeMatch(String externalMatchId) {
     matchRepository.saveAll(
         List.of(
             new ProviderMatch(
-                "message-controller-test-match",
+                externalMatchId,
                 2026,
                 1,
                 "home-1",
@@ -565,7 +842,22 @@ class MessageControllerIntegrationTest {
                 null,
                 MatchStatus.SCHEDULED,
                 null)));
-    return matchRepository.findAll().getFirst().id();
+    return jdbcTemplate.queryForObject(
+        "SELECT id FROM matches WHERE external_id = ?", UUID.class, externalMatchId);
+  }
+
+  private void insertMessage(
+      UUID messageId, UUID circleId, UUID authorUserId, String messageContent, Instant createdAt) {
+    jdbcTemplate.update(
+        """
+        INSERT INTO messages (id, circle_id, author_user_id, content, created_at)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        messageId,
+        circleId,
+        authorUserId,
+        messageContent,
+        OffsetDateTime.ofInstant(createdAt, ZoneOffset.UTC));
   }
 
   private void assertNoMessageWasStored() {
@@ -606,8 +898,19 @@ class MessageControllerIntegrationTest {
     @Bean
     @Primary
     UserDirectory testUserDirectory() {
-      return userIds ->
-          userIds.contains(MEMBER_USER_ID) ? Map.of(MEMBER_USER_ID, "sara") : Map.of();
+      Map<UUID, String> publicUsernames =
+          Map.of(MEMBER_USER_ID, "sara", SECOND_AUTHOR_USER_ID, "alex");
+      return userIds -> {
+        Map<UUID, String> usernames = new HashMap<>();
+        userIds.forEach(
+            userId -> {
+              String username = publicUsernames.get(userId);
+              if (username != null) {
+                usernames.put(userId, username);
+              }
+            });
+        return Map.copyOf(usernames);
+      };
     }
   }
 }
