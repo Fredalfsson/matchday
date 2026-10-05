@@ -5,8 +5,11 @@ import Link from 'next/link';
 import { loginSchema, LoginFormValues } from '@/app/lib/schemas/loginSchema';
 import InputField from '@/app/components/InputField';
 import Wrapper from '@/app/components/Wrapper';
+import { useRouter } from 'next/router';
 
 export default function LoginForm() {
+  const router = useRouter();
+  const AUTH_URL = "/api/auth/login"
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     mode: 'onChange',
@@ -14,6 +17,7 @@ export default function LoginForm() {
   });
 
   const submit = form.handleSubmit(async (data) => {
+  const res = await
     // await login(data)
   });
 
