@@ -7,6 +7,7 @@ import se.matchday.backend.circle.application.CircleRepository;
 import se.matchday.backend.identity.application.CurrentUser;
 import se.matchday.backend.identity.application.UserDirectory;
 import se.matchday.backend.message.application.MessageCreationService;
+import se.matchday.backend.message.application.MessageHistoryService;
 import se.matchday.backend.message.application.MessageRepository;
 
 @Configuration(proxyBeanMethods = false)
@@ -20,5 +21,15 @@ class MessageApplicationConfiguration {
       MessageRepository messageRepository) {
     return new MessageCreationService(
         currentUser, userDirectory, circleRepository, messageRepository, Clock.systemUTC());
+  }
+
+  @Bean
+  MessageHistoryService messageHistoryService(
+      CurrentUser currentUser,
+      UserDirectory userDirectory,
+      CircleRepository circleRepository,
+      MessageRepository messageRepository) {
+    return new MessageHistoryService(
+        currentUser, userDirectory, circleRepository, messageRepository);
   }
 }

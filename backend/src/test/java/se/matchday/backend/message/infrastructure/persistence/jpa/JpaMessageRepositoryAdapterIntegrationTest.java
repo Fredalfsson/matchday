@@ -30,6 +30,7 @@ import se.matchday.backend.circle.domain.Circle;
 import se.matchday.backend.match.application.MatchRepository;
 import se.matchday.backend.match.application.ProviderMatch;
 import se.matchday.backend.match.domain.MatchStatus;
+import se.matchday.backend.message.application.MessagePage;
 import se.matchday.backend.message.application.MessageRepository;
 import se.matchday.backend.message.domain.Message;
 
@@ -192,6 +193,86 @@ class JpaMessageRepositoryAdapterIntegrationTest {
   }
 
   @Test
+  void readsStableNewestFirstMessagePagesForAnActiveMember() {
+    Circle circle = storeCircle();
+    UUID oldestMessageId = UUID.fromString("30000000-0000-0000-0000-000000000001");
+    UUID lowerNewestMessageId = UUID.fromString("30000000-0000-0000-0000-000000000002");
+    UUID higherNewestMessageId = UUID.fromString("30000000-0000-0000-0000-000000000003");
+    insertMessageDirectly(oldestMessageId, circle.id(), USER_ID, "Oldest", CREATED_AT);
+    insertMessageDirectly(
+        lowerNewestMessageId, circle.id(), USER_ID, "Newest lower id", CREATED_AT.plusSeconds(1));
+    insertMessageDirectly(
+        higherNewestMessageId, circle.id(), USER_ID, "Newest higher id", CREATED_AT.plusSeconds(1));
+
+    MessagePage firstPage =
+        messageRepository.findPageForActiveMember(circle.id(), USER_ID, 0, 2).orElseThrow();
+    MessagePage secondPage =
+        messageRepository.findPageForActiveMember(circle.id(), USER_ID, 1, 2).orElseThrow();
+
+    assertThat(firstPage.messages())
+        .extracting(message -> message.id())
+        .containsExactly(higherNewestMessageId, lowerNewestMessageId);
+    assertThat(firstPage.hasNext()).isTrue();
+    assertThat(secondPage.messages())
+        .extracting(message -> message.id())
+        .containsExactly(oldestMessageId);
+    assertThat(secondPage.hasNext()).isFalse();
+  }
+
+  @Test
+  void returnsAnEmptyMessagePageForAnActiveMember() {
+    Circle circle = storeCircle();
+
+    MessagePage page =
+        messageRepository.findPageForActiveMember(circle.id(), USER_ID, 0, 50).orElseThrow();
+
+    assertThat(page.messages()).isEmpty();
+    assertThat(page.hasNext()).isFalse();
+  }
+
+  @Test
+  void doesNotReadMessageHistoryForANonMember() {
+    Circle circle = storeCircle();
+    insertMessageDirectly(circle.id(), "Private history");
+
+    Optional<MessagePage> result =
+        messageRepository.findPageForActiveMember(circle.id(), UUID.randomUUID(), 0, 50);
+
+    assertThat(result).isEmpty();
+  }
+
+  @Test
+  void doesNotReadMessageHistoryWhenAConcurrentLeaveCommitsFirst() throws Exception {
+    Circle circle = storeCircle();
+    insertMessageDirectly(circle.id(), "Private history");
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    CountDownLatch membershipDeleted = new CountDownLatch(1);
+    CountDownLatch allowLeaveCommit = new CountDownLatch(1);
+
+    try {
+      Future<?> leaveAttempt =
+          executor.submit(
+              () ->
+                  deleteMembershipAndAwaitCommit(circle.id(), membershipDeleted, allowLeaveCommit));
+      assertThat(membershipDeleted.await(5, TimeUnit.SECONDS)).isTrue();
+
+      Future<Optional<MessagePage>> readAttempt =
+          executor.submit(
+              () -> messageRepository.findPageForActiveMember(circle.id(), USER_ID, 0, 50));
+      awaitMessageHistoryReadBlockedByMembershipLock();
+
+      allowLeaveCommit.countDown();
+      leaveAttempt.get(10, TimeUnit.SECONDS);
+
+      assertThat(readAttempt.get(10, TimeUnit.SECONDS)).isEmpty();
+    } finally {
+      allowLeaveCommit.countDown();
+      executor.shutdownNow();
+      executor.awaitTermination(5, TimeUnit.SECONDS);
+    }
+  }
+
+  @Test
   void persistsOneThousandUnicodeCharactersAtTheDatabaseBoundary() {
     Circle circle = storeCircle();
     String content = "😀".repeat(1_000);
@@ -282,6 +363,35 @@ class JpaMessageRepositoryAdapterIntegrationTest {
     throw new AssertionError("Message insert did not wait for the membership lock");
   }
 
+  private void awaitMessageHistoryReadBlockedByMembershipLock() {
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+    while (System.nanoTime() < deadline) {
+      Long waitingStatements =
+          jdbcTemplate.queryForObject(
+              """
+              SELECT COUNT(*)
+              FROM pg_stat_activity
+              WHERE datname = current_database()
+                AND position('FROM CIRCLE_MEMBERSHIPS' IN upper(query)) > 0
+                AND position('FOR KEY SHARE' IN upper(query)) > 0
+                AND wait_event_type = 'Lock'
+              """,
+              Long.class);
+      if (waitingStatements != null && waitingStatements > 0) {
+        return;
+      }
+      try {
+        Thread.sleep(25);
+      } catch (InterruptedException exception) {
+        Thread.currentThread().interrupt();
+        throw new IllegalStateException(
+            "Interrupted while waiting for the message history read to acquire its lock",
+            exception);
+      }
+    }
+    throw new AssertionError("Message history read did not wait for the membership lock");
+  }
+
   private static void await(CountDownLatch latch, String timeoutMessage) {
     try {
       if (!latch.await(5, TimeUnit.SECONDS)) {
@@ -294,16 +404,21 @@ class JpaMessageRepositoryAdapterIntegrationTest {
   }
 
   private void insertMessageDirectly(UUID circleId, String content) {
+    insertMessageDirectly(UUID.randomUUID(), circleId, USER_ID, content, CREATED_AT);
+  }
+
+  private void insertMessageDirectly(
+      UUID messageId, UUID circleId, UUID authorUserId, String content, Instant createdAt) {
     jdbcTemplate.update(
         """
         INSERT INTO messages (id, circle_id, author_user_id, content, created_at)
         VALUES (?, ?, ?, ?, ?)
         """,
-        UUID.randomUUID(),
+        messageId,
         circleId,
-        USER_ID,
+        authorUserId,
         content,
-        OffsetDateTime.ofInstant(CREATED_AT, java.time.ZoneOffset.UTC));
+        OffsetDateTime.ofInstant(createdAt, java.time.ZoneOffset.UTC));
   }
 
   private Circle storeCircle() {

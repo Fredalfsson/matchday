@@ -9,4 +9,6 @@ public interface MessageRepository {
 
   Optional<Message> createIfActiveMember(
       UUID circleId, UUID authorUserId, String content, Instant createdAt);
+
+  Optional<MessagePage> findPageForActiveMember(UUID circleId, UUID userId, int page, int size);
 }
