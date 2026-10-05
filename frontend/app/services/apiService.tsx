@@ -35,7 +35,6 @@ api.interceptors.request.use(
 
 let refreshPromise: Promise<string> | null = null;
 
-// Replace this with however your backend issues new access tokens.
 // Using a plain axios instance (not `api`) avoids re-triggering the interceptor.
 const refreshAccessToken = async (): Promise<string> => {
   const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
@@ -88,7 +87,7 @@ api.interceptors.response.use(
 export default api;
 export async function AuthUser() {
   const res = await fetch;
-  if (response.ok) {
+  if (res.ok) {
     router.push('/dashboard');
   } else {
     // Handle errors

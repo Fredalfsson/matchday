@@ -1,0 +1,156 @@
+openapi: 3.1.0
+info:
+  title: Matchday API
+  version: 0.1.0
+  description: API for importing and reading Allsvenskan matches in Matchday.
+servers:
+  - url: http://127.0.0.1:8080
+    description: Local development
+tags:
+  - name: Matches
+    description: Read-only access to matches stored by Matchday.
+  - name: Match imports
+    description: Administrative operations for importing or refreshing match data.
+paths:
+  /api/v1/matches:
+    get:
+      tags:
+        - Matches
+      summary: List stored matches
+      description: >-
+        Returns matches ordered by season, round, scheduled date, kickoff time, and match ID.
+      operationId: listMatches
+      security: []
+      responses:
+        "200":
+          description: Stored matches in the backend's stable default order
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Match"
+        "406":
+          description: The requested response media type is not supported
+  /api/v1/admin/match-imports:
+    post:
+      tags:
+        - Match imports
+      summary: Import or refresh a season
+      description: Imports every Allsvenskan round for the requested season and updates stored matches.
+      operationId: importSeason
+      security:
+        - localBasicAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MatchImportRequest"
+      responses:
+        "200":
+          description: Season imported
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MatchImportResponse"
+        "400":
+          description: Invalid request
+        "401":
+          description: Authentication required
+        "403":
+          description: Insufficient permissions
+components:
+  securitySchemes:
+    localBasicAuth:
+      type: http
+      scheme: basic
+      description: Basic Auth used by the local profile for the administrative import endpoint.
+  schemas:
+    Match:
+      type: object
+      required:
+        - id
+        - season
+        - round
+        - homeTeamName
+        - awayTeamName
+        - scheduledDate
+        - kickoffAt
+        - status
+        - homeScore
+        - awayScore
+        - venueName
+      properties:
+        id:
+          type: string
+          format: uuid
+        season:
+          type: integer
+          format: int32
+          minimum: 1
+        round:
+          type: integer
+          format: int32
+          minimum: 1
+        homeTeamName:
+          type: string
+          minLength: 1
+        awayTeamName:
+          type: string
+          minLength: 1
+        scheduledDate:
+          type: string
+          format: date
+        kickoffAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        status:
+          type: string
+          enum:
+            - SCHEDULED
+            - FINISHED
+            - POSTPONED
+            - UNKNOWN
+        homeScore:
+          type:
+            - integer
+            - "null"
+          format: int32
+          minimum: 0
+        awayScore:
+          type:
+            - integer
+            - "null"
+          format: int32
+          minimum: 0
+        venueName:
+          type:
+            - string
+            - "null"
+          minLength: 1
+    MatchImportRequest:
+      type: object
+      required:
+        - season
+      properties:
+        season:
+          type: integer
+          format: int32
+          minimum: 1
+    MatchImportResponse:
+      type: object
+      required:
+        - season
+        - processedMatches
+      properties:
+        season:
+          type: integer
+          format: int32
+          minimum: 1
+        processedMatches:
+          type: integer
+          format: int32
+          minimum: 0

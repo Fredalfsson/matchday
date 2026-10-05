@@ -1,0 +1,111 @@
+name: Backend Security
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  JAVA_VERSION: "25"
+  DEPENDENCY_CHECK_CACHE_VERSION: "13"
+  DEPENDENCY_CHECK_BOOTSTRAP_FEED: "https://dependency-check.github.io/DependencyCheck_Builder/nvd_cache/nvdcve-{0}.json.gz"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-check:
+    name: Backend dependency audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+
+    defaults:
+      run:
+        shell: bash
+        working-directory: backend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Java
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+
+      - name: Verify NVD API key
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: |
+          if [[ -z "${NVD_API_KEY}" ]]; then
+            echo "NVD_API_KEY must be configured as a GitHub Actions repository secret."
+            exit 1
+          fi
+
+      - name: Set Dependency-Check cache key
+        id: dependency-check-date
+        run: echo "week=$(date -u +'%G-W%V')" >> "${GITHUB_OUTPUT}"
+
+      - name: Restore Dependency-Check data cache
+        id: dependency-check-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.dependency-check
+          key: dependency-check-data-${{ runner.os }}-v${{ env.DEPENDENCY_CHECK_CACHE_VERSION }}-${{ steps.dependency-check-date.outputs.week }}
+          restore-keys: |
+            dependency-check-data-${{ runner.os }}-v${{ env.DEPENDENCY_CHECK_CACHE_VERSION }}-
+
+      - name: Bootstrap Dependency-Check data
+        if: steps.dependency-check-cache.outputs.cache-matched-key == ''
+        run: |
+          ./mvnw --batch-mode --no-transfer-progress dependency-check:update-only \
+            -DdataDirectory="${HOME}/.dependency-check" \
+            -DnvdDatafeedUrl="${DEPENDENCY_CHECK_BOOTSTRAP_FEED}"
+
+      - name: Update Dependency-Check data
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: |
+          ./mvnw --batch-mode --no-transfer-progress dependency-check:update-only \
+            -DdataDirectory="${HOME}/.dependency-check" \
+            -DnvdApiDelay=3500 \
+            -DnvdValidForHours=0
+
+      - name: Save Dependency-Check data cache
+        if: steps.dependency-check-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.dependency-check
+          key: ${{ steps.dependency-check-cache.outputs.cache-primary-key }}
+
+      - name: Run backend dependency audit
+        run: |
+          ./mvnw --batch-mode --no-transfer-progress dependency-check:check \
+            -DskipTests \
+            -DdataDirectory="${HOME}/.dependency-check" \
+            -DautoUpdate=false \
+            -Dformat=HTML
+
+      - name: Upload dependency audit report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: backend-dependency-check-report
+          path: backend/target/dependency-check-report.html
+          if-no-files-found: ignore
+          retention-days: 7

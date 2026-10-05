@@ -1,0 +1,45 @@
+{
+  "events": [
+    {
+      "idEvent": "2398752",
+      "strTimestamp": "2026-04-04T13:00:00",
+      "strEvent": "Degerfors vs Sirius",
+      "strSport": "Soccer",
+      "idLeague": "4347",
+      "strLeague": "Swedish Allsvenskan",
+      "strSeason": "2026",
+      "strHomeTeam": "Degerfors",
+      "strAwayTeam": "Sirius",
+      "intHomeScore": "0",
+      "intRound": "1",
+      "intAwayScore": "3",
+      "dateEvent": "2026-04-04",
+      "strTime": "13:00:00",
+      "idHomeTeam": "134728",
+      "idAwayTeam": "134724",
+      "idVenue": "17256",
+      "strVenue": "Stora Valla",
+      "strStatus": "FT",
+      "strPostponed": "no",
+      "strProviderFieldNotUsedByMatchday": "ignored"
+    },
+    {
+      "idEvent": "future-1",
+      "strTimestamp": null,
+      "strSeason": "2026",
+      "strHomeTeam": "AIK",
+      "strAwayTeam": "Halmstad",
+      "intHomeScore": null,
+      "intRound": "1",
+      "intAwayScore": null,
+      "dateEvent": "2026-04-05",
+      "strTime": null,
+      "idHomeTeam": "134011",
+      "idAwayTeam": "134167",
+      "idVenue": null,
+      "strVenue": null,
+      "strStatus": "NS",
+      "strPostponed": "no"
+    }
+  ]
+}
