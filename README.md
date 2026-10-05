@@ -7,7 +7,7 @@ säkerhetskontroller.
 Backend stöder manuell import och uppdatering av matchdata från TheSportsDB, ett publikt API för
 matcher som har sparats i PostgreSQL samt ett API där en autentiserad användare med en
 applikationsidentitet kan skapa, läsa, ansluta till och lämna en diskussionsgrupp (`circle`) för
-en match. Aktiva circle-medlemmar kan också skicka meddelanden.
+en match. Aktiva circle-medlemmar kan också skicka meddelanden och läsa meddelandehistoriken.
 
 ## Teknik
 
@@ -89,6 +89,7 @@ Svaret är `[]` om databasen ännu inte innehåller några matcher. Fortsätt d�
 | `POST /api/v1/matches/{matchId}/circle` | Autentiserad med applikationsidentitet | Skapar matchens circle och aktiverar skaparens medlemskap |
 | `PUT /api/v1/matches/{matchId}/circle/membership` | Autentiserad med applikationsidentitet | Aktiverar användarens medlemskap idempotent |
 | `DELETE /api/v1/matches/{matchId}/circle/membership` | Autentiserad med applikationsidentitet | Avslutar användarens medlemskap idempotent |
+| `GET /api/v1/circles/{circleId}/messages?page=0&size=50` | Aktiv circle-medlem med applikationsidentitet | Returnerar paginerad meddelandehistorik |
 | `POST /api/v1/circles/{circleId}/messages` | Aktiv circle-medlem med applikationsidentitet | Skapar ett meddelande i circle |
 | `POST /api/v1/admin/match-imports` | Rollen `MATCH_IMPORTER` | Importerar eller uppdaterar angiven säsong |
 
@@ -117,8 +118,10 @@ API-kontraktet finns i [`docs/openapi.yaml`](docs/openapi.yaml) och följer Open
   men inte internt användar-ID eller e-postadress.
 - Meddelandeinnehåll normaliseras genom att omgivande blanksteg tas bort. Innehållet måste vara
   1–1000 Unicode-tecken och får inte innehålla null-tecken.
-- Sparade meddelanden ligger kvar när en medlem lämnar. API-stöd för att läsa meddelandehistorik
-  är ännu inte implementerat.
+- Endast aktiva medlemmar kan läsa meddelandehistoriken. Meddelanden returneras nyast först med
+  stabil sortering och sidstorlek mellan 1 och 100. Standardsidan är `page=0&size=50`.
+- Historiken visar författarnas publika användarnamn, men inte interna användar-ID:n eller
+  e-postadresser. Sparade meddelanden ligger kvar när en medlem lämnar.
 
 Den lokala Basic Auth-profilen autentiserar administrativa importanrop men kopplar
 inte inloggningen till ett användar-ID i domänen. Circle-anrop kräver därför auth-modulens framtida
