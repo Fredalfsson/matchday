@@ -2,13 +2,13 @@ import Link from 'next/link';
 import Wrapper from '@/app/components/Wrapper';
 
 interface CardProps {
-  round: string;
+  round: number;
   team1: string;
   team2: string;
-  id: number;
+  id: string;
   date: string;
-  isAuthenticated: boolean;
-  hasConversation: boolean;
+  isAuthenticated?: boolean;
+  hasConversation?: boolean;
 }
 export default function Card({
   round,
