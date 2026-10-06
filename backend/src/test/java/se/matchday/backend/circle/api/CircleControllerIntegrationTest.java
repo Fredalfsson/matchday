@@ -84,7 +84,7 @@ class CircleControllerIntegrationTest {
   }
 
   private void clearDatabase() {
-    jdbcTemplate.update("TRUNCATE TABLE circle_memberships, circles, matches");
+    jdbcTemplate.update("TRUNCATE TABLE messages, circle_memberships, circles, matches");
   }
 
   @Test
@@ -218,7 +218,14 @@ class CircleControllerIntegrationTest {
 
     mockMvc
         .perform(post("/api/v1/matches/{matchId}/circle", "not-a-uuid").with(csrf()))
-        .andExpect(status().isBadRequest());
+        .andExpect(status().isBadRequest())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.type").value("urn:matchday:problem:invalid-request"))
+        .andExpect(jsonPath("$.title").value("Invalid request"))
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.detail").value("The request path contains an invalid value"))
+        .andExpect(jsonPath("$.trace").doesNotExist())
+        .andExpect(jsonPath("$.exception").doesNotExist());
 
     assertNoCircleWasStored();
   }
@@ -419,7 +426,14 @@ class CircleControllerIntegrationTest {
             put("/api/v1/matches/{matchId}/circle/membership", "not-a-uuid")
                 .with(user(SECOND_USERNAME))
                 .with(csrf()))
-        .andExpect(status().isBadRequest());
+        .andExpect(status().isBadRequest())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.type").value("urn:matchday:problem:invalid-request"))
+        .andExpect(jsonPath("$.title").value("Invalid request"))
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.detail").value("The request path contains an invalid value"))
+        .andExpect(jsonPath("$.trace").doesNotExist())
+        .andExpect(jsonPath("$.exception").doesNotExist());
 
     assertNoCircleWasStored();
   }
@@ -593,7 +607,14 @@ class CircleControllerIntegrationTest {
             delete("/api/v1/matches/{matchId}/circle/membership", "not-a-uuid")
                 .with(user(SECOND_USERNAME))
                 .with(csrf()))
-        .andExpect(status().isBadRequest());
+        .andExpect(status().isBadRequest())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.type").value("urn:matchday:problem:invalid-request"))
+        .andExpect(jsonPath("$.title").value("Invalid request"))
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.detail").value("The request path contains an invalid value"))
+        .andExpect(jsonPath("$.trace").doesNotExist())
+        .andExpect(jsonPath("$.exception").doesNotExist());
 
     assertNoCircleWasStored();
   }
@@ -686,7 +707,14 @@ class CircleControllerIntegrationTest {
 
     mockMvc
         .perform(get("/api/v1/matches/{matchId}/circle", "not-a-uuid"))
-        .andExpect(status().isBadRequest());
+        .andExpect(status().isBadRequest())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.type").value("urn:matchday:problem:invalid-request"))
+        .andExpect(jsonPath("$.title").value("Invalid request"))
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.detail").value("The request path contains an invalid value"))
+        .andExpect(jsonPath("$.trace").doesNotExist())
+        .andExpect(jsonPath("$.exception").doesNotExist());
 
     assertNoCircleWasStored();
   }

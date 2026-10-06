@@ -51,6 +51,13 @@ class JpaCircleRepositoryAdapter implements CircleRepository {
 
   @Override
   @Transactional(readOnly = true)
+  public boolean existsById(UUID circleId) {
+    return circleRepository.existsById(
+        Objects.requireNonNull(circleId, "circleId must not be null"));
+  }
+
+  @Override
+  @Transactional(readOnly = true)
   public Optional<Circle> findByMatchId(UUID matchId) {
     return circleRepository
         .findByMatchId(Objects.requireNonNull(matchId, "matchId must not be null"))

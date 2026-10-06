@@ -9,6 +9,8 @@ public interface CircleRepository {
 
   Circle createWithCreatorMembership(UUID matchId, UUID creatorUserId, Instant createdAt);
 
+  boolean existsById(UUID circleId);
+
   Optional<Circle> findByMatchId(UUID matchId);
 
   boolean hasActiveMembership(UUID circleId, UUID userId);

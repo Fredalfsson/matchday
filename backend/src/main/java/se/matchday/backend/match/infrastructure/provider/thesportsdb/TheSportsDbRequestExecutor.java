@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.client.HttpClientErrorException;
+import se.matchday.backend.match.application.MatchDataProviderUnavailableException;
 
 final class TheSportsDbRequestExecutor {
 
@@ -113,7 +114,8 @@ final class TheSportsDbRequestExecutor {
       sleeper.sleep(duration);
     } catch (InterruptedException exception) {
       Thread.currentThread().interrupt();
-      throw new IllegalStateException("Interrupted while waiting to call TheSportsDB", exception);
+      throw new MatchDataProviderUnavailableException(
+          "Interrupted while waiting to call TheSportsDB", exception);
     }
   }
 

@@ -22,6 +22,8 @@ public record ProviderMatch(
     MatchStatus status,
     @Nullable String venueName) {
 
+  private static final int MAX_TEXT_CODE_POINT_COUNT = 255;
+
   public ProviderMatch {
     requireText(externalMatchId, "externalMatchId");
     requirePositive(season, "season");
@@ -45,8 +47,8 @@ public record ProviderMatch(
     if (status == MatchStatus.SCHEDULED && homeScore != null) {
       throw new IllegalArgumentException("a scheduled match cannot have a result");
     }
-    if (venueName != null && venueName.isBlank()) {
-      throw new IllegalArgumentException("venueName must not be blank");
+    if (venueName != null) {
+      requireText(venueName, "venueName");
     }
   }
 
@@ -54,6 +56,10 @@ public record ProviderMatch(
     Objects.requireNonNull(value, field + " must not be null");
     if (value.isBlank()) {
       throw new IllegalArgumentException(field + " must not be blank");
+    }
+    if (value.codePointCount(0, value.length()) > MAX_TEXT_CODE_POINT_COUNT) {
+      throw new IllegalArgumentException(
+          field + " must not exceed " + MAX_TEXT_CODE_POINT_COUNT + " characters");
     }
   }
 

@@ -14,7 +14,10 @@ import se.matchday.backend.match.infrastructure.provider.thesportsdb.dto.TheSpor
 
 final class TheSportsDbEventMapper {
 
-  ProviderMatch toProviderMatch(TheSportsDbEventDto event) {
+  ProviderMatch toProviderMatch(@Nullable TheSportsDbEventDto event) {
+    if (event == null) {
+      throw new TheSportsDbMappingException("TheSportsDB returned a null event");
+    }
     String externalMatchId = required(event.eventId(), "idEvent");
     int season = positiveInteger(event.season(), "strSeason", externalMatchId);
     int round = positiveInteger(event.round(), "intRound", externalMatchId);
