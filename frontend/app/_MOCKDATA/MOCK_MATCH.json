@@ -1,0 +1,13 @@
+{
+  "id": "match-123",
+  "season": 2024,
+  "round": 1,
+  "homeTeamName": "AIK",
+  "awayTeamName": "Hammarby",
+  "scheduledDate": "2024-04-01",
+  "kickoffAt": "2024-04-01T15:00:00Z",
+  "status": "SCHEDULED",
+  "homeScore": 2,
+  "awayScore": 1,
+  "venueName": "Friends Arena"
+}

@@ -1,0 +1,22 @@
+[
+  {
+    "username": "Sven",
+    "chatId": "1",
+    "date": "2014-23-01",
+    "message": "Hejsan från user_1"
+  },
+
+  {
+    "username": "John",
+    "chatId": "1",
+    "date": "2013-09-01",
+    "message": "Hejsan från user_2"
+  },
+
+  {
+    "username": "Anna",
+    "chatId": "3",
+    "date": "2018-12-30",
+    "message": "Hejsan"
+  }
+]
