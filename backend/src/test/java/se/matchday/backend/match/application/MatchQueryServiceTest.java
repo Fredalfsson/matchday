@@ -33,7 +33,7 @@ class MatchQueryServiceTest {
         match(
             "00000000-0000-0000-0000-000000000006", 2026, 2, "2026-04-01", "2026-04-01T13:00:00Z");
 
-    MatchRepository repository =
+    MatchRepository matchRepository =
         new StubMatchRepository(
             List.of(
                 unknownKickoff,
@@ -44,7 +44,7 @@ class MatchQueryServiceTest {
                 previousSeason,
                 sameKickoffLowerId));
 
-    List<Match> matches = new MatchQueryService(repository).listMatches();
+    List<MatchSummary> matches = new MatchQueryService(matchRepository).listMatches();
 
     assertThat(matches)
         .extracting(match -> match.id())
@@ -84,6 +84,11 @@ class MatchQueryServiceTest {
     @Override
     public List<Match> findAll() {
       return matches;
+    }
+
+    @Override
+    public boolean existsById(UUID matchId) {
+      return matches.stream().anyMatch(match -> match.id().equals(matchId));
     }
   }
 }

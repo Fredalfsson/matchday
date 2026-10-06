@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 import se.matchday.backend.match.domain.Match;
@@ -16,11 +17,11 @@ class SeasonMatchImporterTest {
   @Test
   void importsEveryRoundInOrderAndCollectsTheMatches() {
     RecordingMatchDataProvider provider = new RecordingMatchDataProvider();
-    RecordingMatchRepository repository = new RecordingMatchRepository();
-    SeasonMatchImporter importer = new SeasonMatchImporter(provider, repository);
+    RecordingMatchRepository matchRepository = new RecordingMatchRepository();
+    SeasonMatchImporter importer = new SeasonMatchImporter(provider, matchRepository);
 
     SeasonMatchImportResult result = importer.importSeason(2026);
-    List<ProviderMatch> savedMatches = repository.savedMatches();
+    List<ProviderMatch> savedMatches = matchRepository.savedMatches();
 
     assertThat(provider.requestedRounds()).containsExactlyElementsOf(roundsOneThroughThirty());
     assertThat(result).isEqualTo(new SeasonMatchImportResult(2026, 240));
@@ -34,14 +35,14 @@ class SeasonMatchImporterTest {
   @Test
   void rejectsAnInvalidSeasonBeforeCallingTheProvider() {
     RecordingMatchDataProvider provider = new RecordingMatchDataProvider();
-    RecordingMatchRepository repository = new RecordingMatchRepository();
-    SeasonMatchImporter importer = new SeasonMatchImporter(provider, repository);
+    RecordingMatchRepository matchRepository = new RecordingMatchRepository();
+    SeasonMatchImporter importer = new SeasonMatchImporter(provider, matchRepository);
 
     assertThatThrownBy(() -> importer.importSeason(0))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("season must be a positive integer");
     assertThat(provider.requestedRounds()).isEmpty();
-    assertThat(repository.savedMatches()).isEmpty();
+    assertThat(matchRepository.savedMatches()).isEmpty();
   }
 
   @Test
@@ -56,12 +57,12 @@ class SeasonMatchImporterTest {
           }
           return validRound(season, round);
         };
-    RecordingMatchRepository repository = new RecordingMatchRepository();
-    SeasonMatchImporter importer = new SeasonMatchImporter(provider, repository);
+    RecordingMatchRepository matchRepository = new RecordingMatchRepository();
+    SeasonMatchImporter importer = new SeasonMatchImporter(provider, matchRepository);
 
     assertThatThrownBy(() -> importer.importSeason(2026)).isSameAs(failure);
     assertThat(requestedRounds).containsExactly(1, 2, 3);
-    assertThat(repository.savedMatches()).isEmpty();
+    assertThat(matchRepository.savedMatches()).isEmpty();
   }
 
   @Test
@@ -72,15 +73,15 @@ class SeasonMatchImporterTest {
                 round == 3
                     ? withFirstMatch(validRound(season, round), match(season + 1, round, 1))
                     : validRound(season, round));
-    RecordingMatchRepository repository = new RecordingMatchRepository();
-    SeasonMatchImporter importer = new SeasonMatchImporter(provider, repository);
+    RecordingMatchRepository matchRepository = new RecordingMatchRepository();
+    SeasonMatchImporter importer = new SeasonMatchImporter(provider, matchRepository);
 
     assertThatThrownBy(() -> importer.importSeason(2026))
         .isInstanceOf(InvalidSeasonMatchDataException.class)
         .hasMessage(
             "Provider returned season 2027 for requested season 2026 in round 3 (event event-3-1)");
     assertThat(provider.requestedRounds()).containsExactly(1, 2, 3);
-    assertThat(repository.savedMatches()).isEmpty();
+    assertThat(matchRepository.savedMatches()).isEmpty();
   }
 
   @Test
@@ -91,14 +92,14 @@ class SeasonMatchImporterTest {
                 round == 3
                     ? withFirstMatch(validRound(season, round), match(season, round + 1, 1))
                     : validRound(season, round));
-    RecordingMatchRepository repository = new RecordingMatchRepository();
-    SeasonMatchImporter importer = new SeasonMatchImporter(provider, repository);
+    RecordingMatchRepository matchRepository = new RecordingMatchRepository();
+    SeasonMatchImporter importer = new SeasonMatchImporter(provider, matchRepository);
 
     assertThatThrownBy(() -> importer.importSeason(2026))
         .isInstanceOf(InvalidSeasonMatchDataException.class)
         .hasMessage("Provider returned round 4 for requested round 3 (event event-4-1)");
     assertThat(provider.requestedRounds()).containsExactly(1, 2, 3);
-    assertThat(repository.savedMatches()).isEmpty();
+    assertThat(matchRepository.savedMatches()).isEmpty();
   }
 
   @Test
@@ -110,14 +111,14 @@ class SeasonMatchImporterTest {
                     ? withFirstMatch(
                         validRound(season, round), match("event-1-1", season, round, 1))
                     : validRound(season, round));
-    RecordingMatchRepository repository = new RecordingMatchRepository();
-    SeasonMatchImporter importer = new SeasonMatchImporter(provider, repository);
+    RecordingMatchRepository matchRepository = new RecordingMatchRepository();
+    SeasonMatchImporter importer = new SeasonMatchImporter(provider, matchRepository);
 
     assertThatThrownBy(() -> importer.importSeason(2026))
         .isInstanceOf(InvalidSeasonMatchDataException.class)
         .hasMessage("Provider returned duplicate externalMatchId event-1-1 for season 2026");
     assertThat(provider.requestedRounds()).containsExactly(1, 2);
-    assertThat(repository.savedMatches()).isEmpty();
+    assertThat(matchRepository.savedMatches()).isEmpty();
   }
 
   @Test
@@ -130,14 +131,14 @@ class SeasonMatchImporterTest {
                   case 2 -> validRound(season, round).subList(0, 4);
                   default -> List.of();
                 });
-    RecordingMatchRepository repository = new RecordingMatchRepository();
-    SeasonMatchImporter importer = new SeasonMatchImporter(provider, repository);
+    RecordingMatchRepository matchRepository = new RecordingMatchRepository();
+    SeasonMatchImporter importer = new SeasonMatchImporter(provider, matchRepository);
 
     SeasonMatchImportResult result = importer.importSeason(2026);
 
     assertThat(result).isEqualTo(new SeasonMatchImportResult(2026, 12));
     assertThat(provider.requestedRounds()).containsExactlyElementsOf(roundsOneThroughThirty());
-    assertThat(repository.savedMatches()).hasSize(12);
+    assertThat(matchRepository.savedMatches()).hasSize(12);
   }
 
   @Test
@@ -150,14 +151,14 @@ class SeasonMatchImporterTest {
                         .mapToObj(matchNumber -> match(season, round, matchNumber))
                         .toList()
                     : validRound(season, round));
-    RecordingMatchRepository repository = new RecordingMatchRepository();
-    SeasonMatchImporter importer = new SeasonMatchImporter(provider, repository);
+    RecordingMatchRepository matchRepository = new RecordingMatchRepository();
+    SeasonMatchImporter importer = new SeasonMatchImporter(provider, matchRepository);
 
     assertThatThrownBy(() -> importer.importSeason(2026))
         .isInstanceOf(InvalidSeasonMatchDataException.class)
         .hasMessage("Provider returned 9 matches for season 2026 round 3; maximum is 8");
     assertThat(provider.requestedRounds()).containsExactly(1, 2, 3);
-    assertThat(repository.savedMatches()).isEmpty();
+    assertThat(matchRepository.savedMatches()).isEmpty();
   }
 
   private List<Integer> roundsOneThroughThirty() {
@@ -241,6 +242,11 @@ class SeasonMatchImporterTest {
     @Override
     public List<Match> findAll() {
       return List.of();
+    }
+
+    @Override
+    public boolean existsById(UUID matchId) {
+      return false;
     }
 
     List<ProviderMatch> savedMatches() {

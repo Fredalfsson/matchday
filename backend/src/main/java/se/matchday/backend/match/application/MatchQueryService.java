@@ -20,8 +20,26 @@ public final class MatchQueryService {
     this.matchRepository = matchRepository;
   }
 
-  public List<Match> listMatches() {
-    return matchRepository.findAll().stream().sorted(DEFAULT_ORDER).toList();
+  public List<MatchSummary> listMatches() {
+    return matchRepository.findAll().stream()
+        .sorted(DEFAULT_ORDER)
+        .map(MatchQueryService::toSummary)
+        .toList();
+  }
+
+  private static MatchSummary toSummary(Match match) {
+    return new MatchSummary(
+        match.id(),
+        match.season(),
+        match.round(),
+        match.homeTeamName(),
+        match.awayTeamName(),
+        match.scheduledDate(),
+        match.kickoffAt(),
+        match.status().name(),
+        match.homeScore(),
+        match.awayScore(),
+        match.venueName());
   }
 
   private static int compareKickoffTimes(Match left, Match right) {

@@ -2,13 +2,17 @@ openapi: 3.1.0
 info:
   title: Matchday API
   version: 0.1.0
-  description: API for importing and reading Allsvenskan matches in Matchday.
+  description: >-
+    API for importing and reading Allsvenskan matches and creating, reading, joining, and leaving
+    match circles.
 servers:
   - url: http://127.0.0.1:8080
     description: Local development
 tags:
   - name: Matches
     description: Read-only access to matches stored by Matchday.
+  - name: Circles
+    description: Match-linked discussion circles and their memberships.
   - name: Match imports
     description: Administrative operations for importing or refreshing match data.
 paths:
@@ -32,6 +36,286 @@ paths:
                   $ref: "#/components/schemas/Match"
         "406":
           description: The requested response media type is not supported
+  /api/v1/matches/{matchId}/circle:
+    parameters:
+      - name: matchId
+        in: path
+        required: true
+        description: ID of the match whose discussion circle is addressed.
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags:
+        - Circles
+      summary: Get a match circle
+      description: >-
+        Returns the match circle and whether the authenticated user has an active membership.
+        Reading the circle does not create or activate a membership. User identifiers and email
+        addresses are not exposed.
+      operationId: getMatchCircle
+      security:
+        - localBasicAuth: []
+      responses:
+        "200":
+          description: Circle metadata with the authenticated user's membership status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Circle"
+        "400":
+          description: The matchId path parameter is not a valid UUID
+        "401":
+          description: >-
+            Authentication is required. The security layer may return this status without a body;
+            an authenticated request whose application identity cannot be resolved returns a
+            problem detail.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              example:
+                type: urn:matchday:problem:authentication-required
+                title: Authentication required
+                status: 401
+                detail: An authenticated user identity is required
+                instance: /api/v1/matches/10000000-0000-0000-0000-000000000001/circle
+        "404":
+          description: The match or its circle does not exist
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                matchNotFound:
+                  summary: Match not found
+                  value:
+                    type: urn:matchday:problem:match-not-found
+                    title: Match not found
+                    status: 404
+                    detail: Match 10000000-0000-0000-0000-000000000099 was not found
+                    instance: /api/v1/matches/10000000-0000-0000-0000-000000000099/circle
+                circleNotFound:
+                  summary: Circle not found
+                  value:
+                    type: urn:matchday:problem:circle-not-found
+                    title: Circle not found
+                    status: 404
+                    detail: >-
+                      A circle was not found for match
+                      10000000-0000-0000-0000-000000000001
+                    instance: /api/v1/matches/10000000-0000-0000-0000-000000000001/circle
+    post:
+      tags:
+        - Circles
+      summary: Create a match circle
+      description: >-
+        Creates the single discussion circle for the match and adds the authenticated creator as
+        its first active member. The declared Basic Auth scheme applies to the documented local
+        server; the production authentication mechanism will be supplied by the authentication
+        integration and is intentionally not fixed by this contract yet.
+      operationId: createMatchCircle
+      security:
+        - localBasicAuth: []
+      responses:
+        "201":
+          description: Circle created and creator membership activated
+          headers:
+            Location:
+              description: Relative URI of the created match circle.
+              required: true
+              schema:
+                type: string
+                format: uri-reference
+              example: /api/v1/matches/10000000-0000-0000-0000-000000000001/circle
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Circle"
+        "400":
+          description: The matchId path parameter is not a valid UUID
+        "401":
+          description: >-
+            Authentication is required. The security layer may return this status without a body;
+            an authenticated request whose application identity cannot be resolved returns a
+            problem detail.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              example:
+                type: urn:matchday:problem:authentication-required
+                title: Authentication required
+                status: 401
+                detail: An authenticated user identity is required
+                instance: /api/v1/matches/10000000-0000-0000-0000-000000000001/circle
+        "403":
+          description: >-
+            The request is rejected by the active security policy, for example when CSRF protection
+            is enabled and the request does not contain a valid CSRF token.
+        "404":
+          description: The match does not exist
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              example:
+                type: urn:matchday:problem:match-not-found
+                title: Match not found
+                status: 404
+                detail: Match 10000000-0000-0000-0000-000000000099 was not found
+                instance: /api/v1/matches/10000000-0000-0000-0000-000000000099/circle
+        "409":
+          description: A circle already exists for the match
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              example:
+                type: urn:matchday:problem:circle-already-exists
+                title: Circle already exists
+                status: 409
+                detail: A circle already exists for match 10000000-0000-0000-0000-000000000001
+                instance: /api/v1/matches/10000000-0000-0000-0000-000000000001/circle
+  /api/v1/matches/{matchId}/circle/membership:
+    parameters:
+      - name: matchId
+        in: path
+        required: true
+        description: ID of the match whose discussion circle membership is addressed.
+        schema:
+          type: string
+          format: uuid
+    put:
+      tags:
+        - Circles
+      summary: Join a match circle
+      description: >-
+        Activates the authenticated user's membership in the match circle. The operation is
+        idempotent and returns the same successful response when the membership is already active.
+        The declared Basic Auth scheme applies to the documented local server; the production
+        authentication mechanism will be supplied by the authentication integration and is
+        intentionally not fixed by this contract yet.
+      operationId: joinMatchCircle
+      security:
+        - localBasicAuth: []
+      responses:
+        "204":
+          description: Membership is active
+        "400":
+          description: The matchId path parameter is not a valid UUID
+        "401":
+          description: >-
+            Authentication is required. The security layer may return this status without a body;
+            an authenticated request whose application identity cannot be resolved returns a
+            problem detail.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              example:
+                type: urn:matchday:problem:authentication-required
+                title: Authentication required
+                status: 401
+                detail: An authenticated user identity is required
+                instance: >-
+                  /api/v1/matches/10000000-0000-0000-0000-000000000001/circle/membership
+        "403":
+          description: >-
+            The request is rejected by the active security policy, for example when CSRF protection
+            is enabled and the request does not contain a valid CSRF token.
+        "404":
+          description: The match or its circle does not exist
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                matchNotFound:
+                  summary: Match not found
+                  value:
+                    type: urn:matchday:problem:match-not-found
+                    title: Match not found
+                    status: 404
+                    detail: Match 10000000-0000-0000-0000-000000000099 was not found
+                    instance: >-
+                      /api/v1/matches/10000000-0000-0000-0000-000000000099/circle/membership
+                circleNotFound:
+                  summary: Circle not found
+                  value:
+                    type: urn:matchday:problem:circle-not-found
+                    title: Circle not found
+                    status: 404
+                    detail: >-
+                      A circle was not found for match
+                      10000000-0000-0000-0000-000000000001
+                    instance: >-
+                      /api/v1/matches/10000000-0000-0000-0000-000000000001/circle/membership
+    delete:
+      tags:
+        - Circles
+      summary: Leave a match circle
+      description: >-
+        Deactivates the authenticated user's membership in the match circle without deleting the
+        circle. The operation is idempotent and returns the same successful response when the
+        membership is already inactive. The declared Basic Auth scheme applies to the documented
+        local server; the production authentication mechanism will be supplied by the
+        authentication integration and is intentionally not fixed by this contract yet.
+      operationId: leaveMatchCircle
+      security:
+        - localBasicAuth: []
+      responses:
+        "204":
+          description: Membership is inactive
+        "400":
+          description: The matchId path parameter is not a valid UUID
+        "401":
+          description: >-
+            Authentication is required. The security layer may return this status without a body;
+            an authenticated request whose application identity cannot be resolved returns a
+            problem detail.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              example:
+                type: urn:matchday:problem:authentication-required
+                title: Authentication required
+                status: 401
+                detail: An authenticated user identity is required
+                instance: >-
+                  /api/v1/matches/10000000-0000-0000-0000-000000000001/circle/membership
+        "403":
+          description: >-
+            The request is rejected by the active security policy, for example when CSRF protection
+            is enabled and the request does not contain a valid CSRF token.
+        "404":
+          description: The match or its circle does not exist
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                matchNotFound:
+                  summary: Match not found
+                  value:
+                    type: urn:matchday:problem:match-not-found
+                    title: Match not found
+                    status: 404
+                    detail: Match 10000000-0000-0000-0000-000000000099 was not found
+                    instance: >-
+                      /api/v1/matches/10000000-0000-0000-0000-000000000099/circle/membership
+                circleNotFound:
+                  summary: Circle not found
+                  value:
+                    type: urn:matchday:problem:circle-not-found
+                    title: Circle not found
+                    status: 404
+                    detail: >-
+                      A circle was not found for match
+                      10000000-0000-0000-0000-000000000001
+                    instance: >-
+                      /api/v1/matches/10000000-0000-0000-0000-000000000001/circle/membership
   /api/v1/admin/match-imports:
     post:
       tags:
@@ -65,7 +349,9 @@ components:
     localBasicAuth:
       type: http
       scheme: basic
-      description: Basic Auth used by the local profile for the administrative import endpoint.
+      description: >-
+        Basic Auth supplied by the local profile. Circle operations additionally require an
+        authentication adapter that resolves the credentials to a stable application user ID.
   schemas:
     Match:
       type: object
@@ -131,6 +417,58 @@ components:
             - string
             - "null"
           minLength: 1
+    Circle:
+      type: object
+      description: >-
+        A match's discussion circle with the authenticated user's membership status. User
+        identifiers and email addresses are intentionally not exposed.
+      required:
+        - id
+        - matchId
+        - createdAt
+        - membershipActive
+      properties:
+        id:
+          type: string
+          format: uuid
+        matchId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        membershipActive:
+          type: boolean
+          description: Whether the authenticated user currently has an active membership.
+    ProblemDetail:
+      type: object
+      description: RFC 9457 problem details returned for application-level API errors.
+      required:
+        - type
+        - title
+        - status
+        - detail
+        - instance
+      properties:
+        type:
+          type: string
+          format: uri
+          description: Stable identifier for the problem type.
+        title:
+          type: string
+          minLength: 1
+        status:
+          type: integer
+          format: int32
+          minimum: 100
+          maximum: 599
+        detail:
+          type: string
+          minLength: 1
+        instance:
+          type: string
+          format: uri-reference
+          description: URI of the request that produced this problem occurrence.
     MatchImportRequest:
       type: object
       required:

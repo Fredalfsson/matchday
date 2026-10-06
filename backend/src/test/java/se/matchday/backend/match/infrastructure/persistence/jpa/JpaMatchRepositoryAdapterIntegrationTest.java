@@ -5,10 +5,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
 import se.matchday.backend.TestcontainersConfiguration;
 import se.matchday.backend.match.application.MatchRepository;
 import se.matchday.backend.match.application.ProviderMatch;
@@ -19,18 +23,35 @@ import se.matchday.backend.match.domain.MatchStatus;
 @SpringBootTest
 class JpaMatchRepositoryAdapterIntegrationTest {
 
-  private final MatchRepository repository;
+  private final MatchRepository matchRepository;
+  private final JdbcTemplate jdbcTemplate;
 
   @Autowired
-  JpaMatchRepositoryAdapterIntegrationTest(MatchRepository repository) {
-    this.repository = repository;
+  JpaMatchRepositoryAdapterIntegrationTest(
+      MatchRepository matchRepository, JdbcTemplate jdbcTemplate) {
+    this.matchRepository = matchRepository;
+    this.jdbcTemplate = jdbcTemplate;
+  }
+
+  @BeforeEach
+  void clearDatabaseBeforeTest() {
+    clearDatabase();
+  }
+
+  @AfterEach
+  void clearDatabaseAfterTest() {
+    clearDatabase();
+  }
+
+  private void clearDatabase() {
+    jdbcTemplate.update("TRUNCATE TABLE circle_memberships, circles, matches");
   }
 
   @Test
   void insertsNewMatchesAndUpdatesAnExistingMatchByExternalMatchId() {
     ProviderMatch scheduled = scheduledMatch("event-1", 1, LocalDate.of(2026, 4, 4));
-    repository.saveAll(List.of(scheduled));
-    Match initiallyStored = repository.findAll().getFirst();
+    matchRepository.saveAll(List.of(scheduled));
+    Match initiallyStored = matchRepository.findAll().getFirst();
 
     ProviderMatch finished =
         new ProviderMatch(
@@ -48,9 +69,9 @@ class JpaMatchRepositoryAdapterIntegrationTest {
             MatchStatus.FINISHED,
             "Updated Arena");
     ProviderMatch second = scheduledMatch("event-2", 2, LocalDate.of(2026, 4, 12));
-    repository.saveAll(List.of(finished, second));
+    matchRepository.saveAll(List.of(finished, second));
 
-    assertThat(repository.findAll())
+    assertThat(matchRepository.findAll())
         .extracting(
             (Match match) -> match.homeTeamName(),
             (Match match) -> match.scheduledDate(),
@@ -60,11 +81,21 @@ class JpaMatchRepositoryAdapterIntegrationTest {
                 "Home", LocalDate.of(2026, 4, 5), MatchStatus.FINISHED),
             org.assertj.core.groups.Tuple.tuple(
                 "Home", LocalDate.of(2026, 4, 12), MatchStatus.SCHEDULED));
-    assertThat(repository.findAll())
+    assertThat(matchRepository.findAll())
         .filteredOn(match -> match.round() == 1)
         .singleElement()
         .extracting((Match match) -> match.id())
         .isEqualTo(initiallyStored.id());
+  }
+
+  @Test
+  void reportsWhetherAMatchExistsById() {
+    matchRepository.saveAll(List.of(scheduledMatch("event-exists", 1, LocalDate.of(2026, 4, 4))));
+    UUID storedMatchId = matchRepository.findAll().getFirst().id();
+
+    assertThat(matchRepository.existsById(storedMatchId)).isTrue();
+    assertThat(matchRepository.existsById(UUID.fromString("00000000-0000-0000-0000-000000000099")))
+        .isFalse();
   }
 
   private ProviderMatch scheduledMatch(String externalMatchId, int round, LocalDate scheduledDate) {
