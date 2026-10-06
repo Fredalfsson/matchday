@@ -85,6 +85,25 @@ Frontend finns på `http://localhost:3000`, backend på `http://localhost:8080` 
 `localhost:5432`. Backend kör databasens Flyway-migreringar automatiskt. Avsluta med `Ctrl+C`
 och kör `docker compose down` för att stoppa tjänsterna utan att radera databasvolymen.
 
+Databasen är tom tills du importerar en säsong. Backend kör med den lokala säkerhetsprofilen
+under Compose, så importen kan göras från PowerShell (byt säsongsår vid behov):
+
+```powershell
+$pair = "local-operator:local-dev-password"
+$encoded = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes($pair))
+Invoke-RestMethod `
+  -Uri "http://localhost:8080/api/v1/admin/match-imports" `
+  -Method Post `
+  -Headers @{ Authorization = "Basic $encoded" } `
+  -ContentType "application/json" `
+  -Body '{"season":2026}'
+```
+
+Importen hämtar matcherna från TheSportsDB och sparar dem i PostgreSQL. Den kan ta drygt en
+minut. Efteråt hämtar dashboarden matchlistan; frontendens API-cache uppdateras högst en gång
+per dygn. Ange egna lokala inloggningsuppgifter med miljövariablerna
+`MATCHDAY_LOCAL_USERNAME` och `MATCHDAY_LOCAL_PASSWORD` före `docker compose up`.
+
 ## API
 
 | Metod och sökväg | Åtkomst | Beskrivning |
